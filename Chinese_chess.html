@@ -1,0 +1,1503 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>中国象棋</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: radial-gradient(ellipse at 18% 18%, rgba(255,208,112,0.16), transparent 52%), radial-gradient(ellipse at 82% 18%, rgba(120,72,64,0.26), transparent 55%), radial-gradient(ellipse at 50% 100%, rgba(220,120,60,0.14), transparent 60%), linear-gradient(165deg, #2e1b13 0%, #4a3225 45%, #241310 100%);
+            font-family: "KaiTi", "楷体", serif;
+            margin: 0;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='110' height='110'><circle cx='55' cy='55' r='1.5' fill='rgba(255,214,140,0.12)'/></svg>");
+            background-size: 110px 110px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        #status { margin: 8px; font-size: 20px; font-weight: bold; color: #3e2723; text-align: center; background: #fff8e1; padding: 6px 25px; border-radius: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.45), 0 0 0 2px rgba(200,150,60,0.55); min-width: 200px; transition: background 0.3s; cursor: pointer; user-select: none; position: relative; z-index: 1; }
+        #status.game-over { background: #ffcdd2; }
+        #overlayText { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; font-family: "LiSu","隶书","KaiTi",serif; font-weight: bold; text-shadow: 3px 3px 6px rgba(0,0,0,0.6); pointer-events: none; z-index: 100; opacity: 0; transition: opacity 0.3s; }
+        .main-container { display: flex; align-items: flex-start; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 10px; }
+        .side-panel { width: 200px; background: #fff8e1; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); padding: 15px; display: flex; flex-direction: column; min-height: 500px; max-height: 500px; }
+        .chat-box { flex: 1; overflow-y: auto; background: #efebe9; border-radius: 8px; padding: 8px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; min-height: 100px; }
+        .chat-msg { max-width: 85%; padding: 6px 10px; border-radius: 12px; word-break: break-all; }
+        .chat-msg.system { align-self: flex-start; background: #ffccbc; color: #4e342e; }
+        .chat-msg.angry { align-self: flex-start; background: #ef9a9a; color: #b71c1c; font-weight: bold; }
+        .chat-msg.mock { align-self: flex-start; background: #fff9c4; color: #f57f17; font-weight: bold; }
+        .controls { display: flex; gap: 10px; margin: 8px 0; flex-wrap: wrap; justify-content: center; }
+        button { padding: 6px 16px; font-size: 15px; background: #8d6e63; color: white; border: none; border-radius: 16px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: background 0.2s, transform 0.1s; }
+        button:hover { background: #6d4c41; transform: scale(1.02); }
+        button:active { transform: scale(0.97); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        button.active { background: #b71c1c; box-shadow: 0 0 8px #ff8a80; }
+        button.side-btn { padding: 10px 25px; font-size: 18px; background: #b71c1c; color: #fff; border-radius: 20px; margin: 0 10px; min-width: 120px; }
+        button.side-btn.black-btn { background: #1a237e; }
+        button.side-btn.green-btn { background: #2e7d32; }
+        button.side-btn.orange-btn { background: #e65100; }
+        button.side-btn.purple-btn { background: #6a1b9a; }
+        button.side-btn.plane-btn { background: #c62828; }
+        button.side-btn.feng-btn { background: #455a64; }
+        button.side-btn.rich-btn { background: #f9a825; color: #3e2723; }
+        button.side-btn.wushu-btn { background: #f44336; color: #fff; }
+        button.side-btn.bridge-btn { background: #1565c0; color: #fff; }
+        button.side-btn.engineer-btn { background: #795548; color: #fff; }
+        button.side-btn.dunjia-btn { background: #00695c; color: #fff; }
+        button.side-btn.fire-btn { background: #d84315; color: #fff; }
+        button.side-btn.kongcheng-btn { background: #4a148c; color: #fff; }
+        #modeSelection, #sideSelection, #heroSelection, #aiHeroSelection {
+            display: flex; flex-direction: column; align-items: center; gap: 18px; margin: 12px 0 22px;
+            background: linear-gradient(165deg, rgba(255,248,225,0.94), rgba(255,234,196,0.9));
+            border: 2px solid rgba(176,118,56,0.75);
+            border-radius: 26px;
+            padding: 28px 36px;
+            max-width: 94vw;
+            box-shadow: 0 20px 70px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.65), 0 0 90px rgba(255,196,96,0.14);
+            backdrop-filter: blur(8px);
+            position: relative; z-index: 1;
+            animation: cardPop 0.4s cubic-bezier(0.2, 1.4, 0.5, 1);
+        }
+        @keyframes cardPop { from { opacity: 0; transform: translateY(22px) scale(0.95); } to { opacity: 1; transform: none; } }
+        .menu-title { font-size: 26px; font-weight: bold; color: #3e2723; letter-spacing: 2px; text-shadow: 0 1px 0 rgba(255,255,255,0.7); margin: 2px 0 6px; text-align: center; }
+        .mode-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .hero-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 12px; width: 100%; max-width: 780px; }
+        .hero-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+            padding: 13px 8px 11px; border-radius: 16px; font-size: 15px; font-weight: bold;
+            border: 2px solid #8d6e63; background: #fffdf6; color: #3e2723;
+            cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.16);
+            transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s, background 0.16s;
+            user-select: none; min-width: 0;
+        }
+        .hero-btn .hero-emoji { font-size: 28px; line-height: 1.15; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.22)); }
+        .hero-btn .hero-name { font-size: 15px; line-height: 1.25; text-align: center; }
+        .hero-btn:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 12px 28px rgba(0,0,0,0.32), 0 0 0 2px rgba(255,183,77,0.6); background: #ffffff; }
+        .hero-btn:active { transform: scale(0.95); }
+        .hero-btn.mode-btn { padding: 20px 34px; font-size: 20px; border-radius: 20px; min-width: 190px; }
+        .hero-btn.green-btn { background: linear-gradient(160deg,#e8f5e9,#c8e6c9); border-color: #2e7d32; color: #1b5e20; }
+        .hero-btn.black-btn { background: linear-gradient(160deg,#e8eaf6,#c5cae9); border-color: #1a237e; color: #1a237e; }
+        .hero-btn.orange-btn { background: linear-gradient(160deg,#fff3e0,#ffe0b2); border-color: #e65100; color: #e65100; }
+        .hero-btn.purple-btn { background: linear-gradient(160deg,#f3e5f5,#e1bee7); border-color: #6a1b9a; color: #6a1b9a; }
+        .hero-btn.plane-btn { background: linear-gradient(160deg,#ffebee,#ffcdd2); border-color: #c62828; color: #c62828; }
+        .hero-btn.feng-btn { background: linear-gradient(160deg,#eceff1,#cfd8dc); border-color: #455a64; color: #37474f; }
+        .hero-btn.rich-btn { background: linear-gradient(160deg,#fff8e1,#ffecb3); border-color: #f9a825; color: #f57f17; }
+        .hero-btn.wushu-btn { background: linear-gradient(160deg,#ffebee,#ff8a80); border-color: #f44336; color: #d32f2f; }
+        .hero-btn.bridge-btn { background: linear-gradient(160deg,#e3f2fd,#bbdefb); border-color: #1565c0; color: #0d47a1; }
+        .hero-btn.engineer-btn { background: linear-gradient(160deg,#efebe9,#d7ccc8); border-color: #795548; color: #4e342e; }
+        .hero-btn.dunjia-btn { background: linear-gradient(160deg,#e0f2f1,#b2dfdb); border-color: #00695c; color: #00695c; }
+        .hero-btn.fire-btn { background: linear-gradient(160deg,#fbe9e7,#ffccbc); border-color: #d84315; color: #bf360c; }
+        .hero-btn.kongcheng-btn { background: linear-gradient(160deg,#ede7f6,#d1c4e9); border-color: #4a148c; color: #4a148c; }
+        .hero-btn.default-red { background: linear-gradient(160deg,#ffebee,#ffcdd2); border-color: #b71c1c; color: #b71c1c; }
+        #tipBar {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 999;
+            background: linear-gradient(90deg, rgba(30,18,10,0.93), rgba(62,45,33,0.93), rgba(30,18,10,0.93));
+            color: #ffe9c4; font-size: 14px; line-height: 1.5;
+            padding: 9px 26px; text-align: center; pointer-events: none;
+            border-top: 2px solid rgba(212,158,80,0.5);
+            box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
+            min-height: 24px; display: flex; align-items: center; justify-content: center;
+            letter-spacing: 0.5px;
+        }
+        canvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); border: 3px solid #3e2723; border-radius: 8px; background: #f0d9b5; cursor: pointer; max-width: 100%; height: auto; }
+        .hand-area { background: #d7ccc8; border-radius: 8px; padding: 8px; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 60px; align-items: center; }
+        .card-slot { width: 42px; height: 58px; background: white; border: 2px solid #5d4037; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; cursor: default; transition: background 0.2s, transform 0.1s; font-family: Arial, sans-serif; }
+        .card-slot.discardable { cursor: pointer; background: #fff3e0; }
+        .card-slot.discardable:hover { background: #ffe0b2; transform: scale(1.05); }
+        .skill-btn { margin-top: 4px; padding: 5px 10px; font-size: 13px; border-radius: 10px; }
+        .skill-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+        .skill-grid .skill-btn { font-size: 14px; padding: 8px 2px; border-radius: 10px; background: linear-gradient(160deg, #a1887f, #8d6e63); box-shadow: 0 3px 8px rgba(0,0,0,0.26); transition: transform 0.14s, box-shadow 0.14s, background 0.14s; }
+        .skill-grid .skill-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 16px rgba(0,0,0,0.34); background: linear-gradient(160deg, #b89a8f, #8d6e63); }
+        .skill-grid .skill-btn:disabled { opacity: 0.45; }
+        .panel-title { font-weight: bold; margin-bottom: 8px; color: #3e2723; font-size: 16px; display: flex; align-items: center; gap: 6px; }
+        .badge { background: #3e2723; color: #fff8e1; border-radius: 12px; padding: 0 10px; font-size: 13px; }
+        .rage-bar { background: #ffcdd2; border-radius: 8px; padding: 4px 8px; margin: 4px 0; font-weight: bold; color: #b71c1c; }
+        .bridge-btn-area { margin-top: 8px; padding: 6px; background: #bbdefb; border-radius: 8px; text-align: center; }
+        #chatMessages { flex: 1; overflow-y: auto; background: #efebe9; border-radius: 8px; padding: 8px; min-height: 150px; margin-bottom: 8px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+        .chat-msg-user { align-self: flex-end; background: #c8e6c9; color: #1b5e20; padding: 4px 10px; border-radius: 12px; max-width: 85%; }
+        .chat-msg-ai { align-self: flex-start; background: #bbdefb; color: #0d47a1; padding: 4px 10px; border-radius: 12px; max-width: 85%; }
+        #chatInput { flex: 1; padding: 4px 8px; border-radius: 16px; border: 1px solid #8d6e63; background: #fff; font-size: 14px; outline: none; }
+        #chatInput:focus { border-color: #5d4037; }
+        /* 联机对战 UI */
+        #onlineConnPanel { display: flex; flex-direction: column; align-items: center; gap: 16px; margin: 12px 0 22px; background: linear-gradient(165deg, rgba(255,248,225,0.94), rgba(255,234,196,0.9)); border: 2px solid rgba(176,118,56,0.75); border-radius: 26px; padding: 28px 36px; max-width: 94vw; box-shadow: 0 20px 70px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.65), 0 0 90px rgba(255,196,96,0.14); backdrop-filter: blur(8px); position: relative; z-index: 1; animation: cardPop 0.4s cubic-bezier(0.2, 1.4, 0.5, 1); }
+        .conn-textarea { width: 100%; max-width: 500px; min-height: 80px; font-size: 12px; font-family: monospace; padding: 8px; border: 1px solid #8d6e63; border-radius: 8px; background: #fff; resize: vertical; word-break: break-all; }
+        .conn-status { font-size: 16px; font-weight: bold; color: #3e2723; padding: 8px 16px; border-radius: 12px; background: #fff8e1; }
+        .conn-status.connected { background: #c8e6c9; color: #1b5e20; }
+        .conn-status.waiting { background: #fff9c4; color: #f57f17; }
+        .conn-status.error { background: #ffcdd2; color: #b71c1c; }
+        .chat-msg.own { align-self: flex-end; background: #c8e6c9; color: #1b5e20; }
+        .chat-msg.opp { align-self: flex-start; background: #bbdefb; color: #0d47a1; }
+        @media (max-width: 900px) { .side-panel { width: 160px; min-height: 350px; max-height: 400px; padding: 10px; } .card-slot { width: 32px; height: 44px; font-size: 14px; } #overlayText { font-size: 40px; } }
+        @media (max-width: 700px) { .main-container { flex-direction: column; align-items: center; } .side-panel { width: 100%; max-width: 500px; min-height: 150px; max-height: 250px; } .chat-box { min-height: 60px; max-height: 120px; } .skill-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } #chatMessages { min-height: 80px; } }
+        .skill-btn.triple-active { background: #f57f17; color: #fff; box-shadow: 0 0 12px #f57f17; animation: pulse-gold 0.8s infinite alternate; }
+        .skill-btn.bomb-active { background: #c62828; color: #fff; box-shadow: 0 0 12px #c62828; animation: pulse-red 0.8s infinite alternate; }
+        @keyframes pulse-gold { 0% { box-shadow: 0 0 6px #f57f17; } 100% { box-shadow: 0 0 20px #f9a825, 0 0 40px rgba(255,180,0,0.4); } }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 6px #c62828; } 100% { box-shadow: 0 0 20px #c62828, 0 0 40px rgba(198,40,40,0.4); } }
+        .skill-btn.ultimate-active { background: #ff6f00; color: #fff; box-shadow: 0 0 20px #ff6f00; animation: pulse-ultimate 0.6s infinite alternate; }
+        @keyframes pulse-ultimate { 0% { box-shadow: 0 0 10px #ff6f00; } 100% { box-shadow: 0 0 30px #ffab00, 0 0 60px rgba(255,171,0,0.5); } }
+    </style>
+</head>
+<body>
+<div id="status">中国象棋</div>
+<div id="overlayText"></div>
+<div id="tipBar">鼠标悬停技能或英雄可查看介绍</div>
+<div id="eggOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:300;align-items:center;justify-content:center;">
+    <div style="background:#fff8e1;border-radius:16px;padding:24px 28px;text-align:center;max-width:460px;box-shadow:0 10px 40px rgba(0,0,0,0.5);border:2px solid #8d6e63;">
+        <div style="font-size:22px;font-weight:bold;color:#3e2723;margin-bottom:6px;">🎁 彩蛋兑换</div>
+        <div style="font-size:14px;color:#795548;margin-bottom:12px;">输入兑换码，解锁中国电信专属皮肤</div>
+        <textarea id="eggCodeInput" rows="3" style="width:100%;font-size:14px;padding:8px;border:1px solid #8d6e63;border-radius:8px;box-sizing:border-box;outline:none;resize:none;"></textarea>
+        <div style="margin-top:14px;display:flex;gap:12px;justify-content:center;">
+            <button class="skill-btn" style="padding:8px 22px;font-size:15px;" onclick="redeemEgg()">确认兑换</button>
+            <button class="skill-btn" style="padding:8px 22px;font-size:15px;" onclick="closeEggDialog()">取消</button>
+        </div>
+        <div id="eggMsg" style="font-size:14px;margin-top:10px;color:#b71c1c;min-height:20px;"></div>
+    </div>
+</div>
+<div id="modeSelection">
+    <div class="menu-title">选择游戏模式</div>
+    <div class="mode-row">
+        <button class="hero-btn mode-btn green-btn" onclick="selectMode('normal')" data-desc="标准中国象棋规则，红黑对战。适合熟悉传统玩法的你。"><span class="hero-emoji">♟️</span><span class="hero-name">普通模式</span></button>
+        <button class="hero-btn mode-btn purple-btn" onclick="selectMode('skill')" data-desc="双方可选英雄，拥有五花八门的技能。技能绝不改变，纯彩蛋加成！"><span class="hero-emoji">✨</span><span class="hero-name">技能模式</span></button>
+        <button class="hero-btn mode-btn bridge-btn" onclick="selectMode('online')" data-desc="通过局域网与好友联机对战，双方各选英雄，技能效果同步。"><span class="hero-emoji">🌐</span><span class="hero-name">联机对战</span></button>
+    </div>
+</div>
+<div id="onlineConnPanel" style="display:none;">
+    <div class="menu-title">联机对战</div>
+    <div id="connPhase1" style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;">
+        <button class="hero-btn mode-btn green-btn" onclick="onlineCreateRoom()" data-desc="创建房间，生成邀请码发送给对方。"><span class="hero-emoji">🏠</span><span class="hero-name">创建房间</span></button>
+        <button class="hero-btn mode-btn bridge-btn" onclick="onlineJoinRoom()" data-desc="粘贴对方发来的邀请码，加入房间。"><span class="hero-emoji">🚪</span><span class="hero-name">加入房间</span></button>
+    </div>
+    <div id="connPhaseHost" style="display:none;flex-direction:column;align-items:center;gap:12px;width:100%;">
+        <div class="conn-status waiting" id="hostStatus">⏳ 正在生成邀请码...</div>
+        <label style="font-size:14px;color:#5d4037;">↓ 复制下方邀请码，发送给对方 ↓</label>
+        <textarea class="conn-textarea" id="hostOffer" readonly onclick="this.select()"></textarea>
+        <div style="display:flex;gap:10px;">
+            <button class="skill-btn" onclick="copyToClipboard('hostOffer')" style="padding:8px 20px;">📋 复制邀请码</button>
+            <button class="skill-btn" onclick="onlineCancel()" style="padding:8px 20px;">取消</button>
+        </div>
+    </div>
+    <div id="connPhaseJoin" style="display:none;flex-direction:column;align-items:center;gap:12px;width:100%;">
+        <div class="conn-status" id="joinStatus">📝 请粘贴对方发来的邀请码</div>
+        <textarea class="conn-textarea" id="joinOffer" placeholder="在此粘贴对方的邀请码..."></textarea>
+        <button class="skill-btn" onclick="onlineGenerateAnswer()" style="padding:8px 20px;">🔗 生成应答码</button>
+        <div id="joinAnswerArea" style="display:none;flex-direction:column;align-items:center;gap:8px;width:100%;">
+            <label style="font-size:14px;color:#5d4037;">↓ 复制下方应答码，发送给对方 ↓</label>
+            <textarea class="conn-textarea" id="joinAnswer" readonly onclick="this.select()"></textarea>
+            <button class="skill-btn" onclick="copyToClipboard('joinAnswer')" style="padding:8px 20px;">📋 复制应答码</button>
+        </div>
+        <button class="skill-btn" onclick="onlineCancel()" style="padding:8px 20px;">取消</button>
+    </div>
+    <div id="connPhaseHostAnswer" style="display:none;flex-direction:column;align-items:center;gap:12px;width:100%;">
+        <div class="conn-status waiting" id="hostAnswerStatus">⏳ 请粘贴对方发来的应答码</div>
+        <textarea class="conn-textarea" id="hostAnswerInput" placeholder="在此粘贴对方的应答码..."></textarea>
+        <button class="skill-btn" onclick="onlineAcceptAnswer()" style="padding:8px 20px;">✅ 确认连接</button>
+        <button class="skill-btn" onclick="onlineCancel()" style="padding:8px 20px;">取消</button>
+    </div>
+</div>
+<div id="sideSelection" style="display:none;">
+    <div class="menu-title">选择执子颜色</div>
+    <div class="mode-row">
+        <button class="hero-btn mode default-red" onclick="chooseSide('red')" data-desc="红方先行，由你执红。传统开局。"><span class="hero-emoji">🔴</span><span class="hero-name">执红先行</span></button>
+        <button class="hero-btn mode black-btn" onclick="chooseSide('black')" data-desc="黑方后手，由你执黑。后发制人。"><span class="hero-emoji">⚫</span><span class="hero-name">执黑后手</span></button>
+    </div>
+</div>
+<div id="heroSelection" style="display:none;">
+    <div class="menu-title">选择己方人物</div>
+    <div class="hero-grid">
+        <button class="hero-btn" onclick="selectPlayerHero('gambler')" data-desc="每吃对方一子，牌槽+3；可弃牌、摸牌，四张同点可放炸弹、三张可三带一。"><span class="hero-emoji">🃏</span><span class="hero-name">赌神</span></button>
+        <button class="hero-btn green-btn" onclick="selectPlayerHero('fighter')" data-desc="己方将帅可纵横八方向移动，使用霸气侧漏清空将帅周围5×5敌方棋子。"><span class="hero-emoji">🥊</span><span class="hero-name">拳皇</span></button>
+        <button class="hero-btn orange-btn" onclick="selectPlayerHero('yun')" data-desc="点击棋盘选择一列，大运火箭从天而降清空整列棋子（冷却9回合）。"><span class="hero-emoji">🚀</span><span class="hero-name">大运</span></button>
+        <button class="hero-btn purple-btn" onclick="selectPlayerHero('qimen')" data-desc="八门奇阵，各门一种异能：休/生/伤/杜/景/死/惊/开，每门仅一次。"><span class="hero-emoji">📜</span><span class="hero-name">奇门</span></button>
+        <button class="hero-btn plane-btn" onclick="selectPlayerHero('911')" data-desc="神风特攻：飞机构直击敌方任意一子，清除后冷却5回合。"><span class="hero-emoji">✈️</span><span class="hero-name">911</span></button>
+        <button class="hero-btn feng-btn" onclick="selectPlayerHero('feng')" data-desc="冯之棋魂：马可跨日字与田字，打瓦降双马，堵桥清敌方马。"><span class="hero-emoji">🐴</span><span class="hero-name">冯</span></button>
+        <button class="hero-btn rich-btn" onclick="selectPlayerHero('rich')" data-desc="吃子得银币，2银换1金；金币可置敌军棋子为绿色，绿色棋子无法移动。"><span class="hero-emoji">💰</span><span class="hero-name">富翁</span></button>
+        <button class="hero-btn wushu-btn" onclick="selectPlayerHero('wushu')" data-desc="武僧聚气：吃子得怒气，释放大威天龙清场，怒气15满放毁天灭地。"><span class="hero-emoji">🧘</span><span class="hero-name">武僧</span></button>
+        <button class="hero-btn engineer-btn" onclick="selectPlayerHero('engineer')" data-desc="修建/拆除水平、垂直铁路，己方兵沿铁轨纵横千里，冷却2回合。"><span class="hero-emoji">🛠️</span><span class="hero-name">工兵</span></button>
+        <button class="hero-btn dunjia-btn" onclick="selectPlayerHero('dunjia')" data-desc="遁甲八门：固/接/转/闭/隐/越/深/重，多种奇门遁甲妙法。"><span class="hero-emoji">🛡️</span><span class="hero-name">遁甲</span></button>
+        <button class="hero-btn kongcheng-btn" onclick="selectPlayerHero('kongcheng')" data-desc="空城计：开局只留将帅士象与中路兵，走位50回合即可获胜。"><span class="hero-emoji">🏯</span><span class="hero-name">空城计</span></button>
+        <button class="hero-btn rich-btn" onclick="selectPlayerHero('zhongzhi')" data-desc="众志成城：己方非将帅棋子未吃完前，敌方不能吃己方将帅、不能将军。"><span class="hero-emoji">🛡️</span><span class="hero-name">众志成城</span></button>
+        <button class="hero-btn black-btn" onclick="selectPlayerHero('none')" data-desc="不选英雄，以普通棋子开局，靠实力说话。"><span class="hero-emoji">🚫</span><span class="hero-name">劳资就不选</span></button>
+    </div>
+</div>
+<div id="aiHeroSelection" style="display:none;">
+    <div class="menu-title">选择人机角色</div>
+    <div class="hero-grid">
+        <button class="hero-btn bridge-btn" onclick="selectAiHero('bridge')" data-desc="黄河浮桥：河沿有桥可渡，人机会随机拆桥，玩家可点兵重建。"><span class="hero-emoji">🌉</span><span class="hero-name">黄河浮桥</span></button>
+        <button class="hero-btn engineer-btn" onclick="selectAiHero('engineer')" data-desc="AI工兵：自动修建铁路，强化己方兵卒移动。"><span class="hero-emoji">🛠️</span><span class="hero-name">工兵</span></button>
+        <button class="hero-btn green-btn" onclick="selectAiHero('fighter')" data-desc="AI拳皇：将帅纵横，霸气侧漏清场。"><span class="hero-emoji">🥊</span><span class="hero-name">拳皇</span></button>
+        <button class="hero-btn orange-btn" onclick="selectAiHero('yun')" data-desc="AI大运：随机选中一列火箭轰炸。"><span class="hero-emoji">🚀</span><span class="hero-name">大运</span></button>
+        <button class="hero-btn plane-btn" onclick="selectAiHero('plane')" data-desc="AI911：飞机构直击你的棋子，冷却2回合自动释放。"><span class="hero-emoji">✈️</span><span class="hero-name">911</span></button>
+        <button class="hero-btn fire-btn" onclick="selectAiHero('dihu')" data-desc="地火：十字蔓延焚烧两波，AI每7回合释放。"><span class="hero-emoji">🔥</span><span class="hero-name">地火</span></button>
+        <button class="hero-btn kongcheng-btn" onclick="selectAiHero('kongcheng')" data-desc="AI空城计：坚守50回合获胜。"><span class="hero-emoji">🏯</span><span class="hero-name">空城计</span></button>
+        <button class="hero-btn rich-btn" onclick="selectAiHero('zhongzhi')" data-desc="AI众志成城：AI非将帅棋子未吃完前，你无法吃AI将帅、不能将军。"><span class="hero-emoji">🛡️</span><span class="hero-name">众志成城</span></button>
+        <button class="hero-btn black-btn" onclick="selectAiHero('none')" data-desc="人机不使用任何技能。"><span class="hero-emoji">🚫</span><span class="hero-name">无技能</span></button>
+        <button class="hero-btn purple-btn" onclick="selectAiHero('random')" data-desc="随机抽选一个人机角色，惊喜不断。"><span class="hero-emoji">🎲</span><span class="hero-name">随机</span></button>
+    </div>
+</div>
+<div class="controls" style="display:none;" id="gameControls">
+    <button id="toggleAI" onclick="toggleAI()">人机对战 (开启)</button>
+    <button id="resignBtn" onclick="onlineResign()" style="display:none;">认输</button>
+    <button onclick="resetGame()">重新开始</button>
+    <button onclick="backToMenu()">返回菜单</button>
+</div>
+<div class="main-container" id="gameArea" style="display:none;">
+    <div class="side-panel">
+        <div class="panel-title" id="leftPanelTitle">🤖 人机有话说</div>
+        <div class="chat-box" id="aiLogBox"></div>
+        <div id="onlineChatArea" style="display:none;margin-top:8px;">
+            <div style="display:flex;gap:4px;">
+                <input type="text" id="onlineChatInput" placeholder="说点什么..." style="flex:1;padding:4px 8px;border-radius:16px;border:1px solid #8d6e63;background:#fff;font-size:14px;outline:none;" onkeydown="if(event.key==='Enter') sendOnlineChat()">
+                <button onclick="sendOnlineChat()" style="padding:4px 12px;">发送</button>
+            </div>
+        </div>
+        <div id="buildBridgeArea" style="display:none;margin-top:8px;">
+            <button class="skill-btn" id="buildBridgeBtn" onclick="startBuildBridge()" data-desc="点击河沿的己方兵，重建被拆的浮桥（消耗一回合）。">🌉 建桥 (消耗一回合)</button>
+        </div>
+    </div>
+    <canvas id="chessCanvas"></canvas>
+    <div class="side-panel" id="skillPanel">
+        <div id="chatPanel" style="display:none;flex-direction:column;height:100%;">
+            <div class="panel-title">💬 与人机对话</div>
+            <div id="chatMessages"><div class="chat-msg-ai">👋 说点什么吧～</div></div>
+            <div style="display:flex;gap:4px;margin-top:4px;">
+                <input type="text" id="chatInput" placeholder="说点什么..." onkeydown="if(event.key==='Enter') sendChat()">
+                <button id="chatSendBtn" onclick="sendChat()">发送</button>
+            </div>
+        </div>
+        <div id="handPanel" style="display:none;">
+            <div class="panel-title">🃏 牌堆 <span class="badge" id="handCount">0</span>/<span class="badge" id="maxSlots">7</span></div>
+            <div class="hand-area" id="handCards"></div>
+            <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">
+                <button class="skill-btn" id="discardBtn" onclick="discardCard()" disabled data-desc="丢弃选中的手牌，为摸新牌腾出空间。">弃牌</button>
+                <button class="skill-btn" id="bombBtn" onclick="activateBomb()" disabled data-desc="手牌四张同点可激活：点击棋盘选中心，清除2×2范围敌方棋子。">💣 炸弹</button>
+                <button class="skill-btn" id="tripleBtn" onclick="activateTriple()" disabled data-desc="手牌三张同点可激活：直接消灭一个敌方非将帅棋子。">🎯 三带一</button>
+            </div>
+        </div>
+        <div id="fighterPanel" style="display:none;">
+            <div class="panel-title">🥊 拳皇技能 <span style="font-size:12px;color:#c62828;"></span></div>
+            <button class="skill-btn" id="fighterSkillBtn" onclick="useFighterSkill()" data-desc="霸气侧漏：清除己方将帅周围5×5范围内所有敌方棋子（冷却5回合）。">💥 霸气侧漏 (冷却:<span id="cooldownText">0</span>)</button>
+        </div>
+        <div id="yunPanel" style="display:none;">
+            <div class="panel-title">🚀 大运技能</div>
+            <button class="skill-btn" id="yunSkillBtn" onclick="useYunSkill()" data-desc="点击棋盘选择一列，火箭清空整列棋子（冷却9回合）。">🚀 大运 (冷却:<span id="yunCooldownText">0</span>)</button>
+        </div>
+        <div id="qimenPanel" style="display:none;">
+            <div class="panel-title">📜 奇门 <span style="font-size:13px;font-weight:normal;color:#795548;">(仅一次)</span></div>
+            <div class="skill-grid">
+                <button class="skill-btn" id="qimenXiu" onclick="qimen('xiu')" data-desc="休门：己方所有未过河棋子随机传送过河。">休</button>
+                <button class="skill-btn" id="qimenSheng" onclick="qimen('sheng')" data-desc="生门：己方棋盘复原为开局初始布局。">生</button>
+                <button class="skill-btn" id="qimenShang" onclick="qimen('shang')" data-desc="伤门：随机消灭敌方一个非将帅棋子。">伤</button>
+                <button class="skill-btn" id="qimenDu" onclick="qimen('du')" data-desc="杜门：随机空位生成一辆己方战车。">杜</button>
+                <button class="skill-btn" id="qimenJing" onclick="qimen('jing')" data-desc="景门：随机空位生成一门己方大炮。">景</button>
+                <button class="skill-btn" id="qimenSi" onclick="qimen('si')" data-desc="死门：五五开！一方将帅直接殒命，游戏结束。">死</button>
+                <button class="skill-btn" id="qimenJing2" onclick="qimen('jing2')" data-desc="惊门：敌方所有未过河棋子随机传送过河。">惊</button>
+                <button class="skill-btn" id="qimenKai" onclick="qimen('kai')" data-desc="开门：将帅正前方相邻的棋子移开（双方）。">开</button>
+            </div>
+        </div>
+        <div id="planePanel" style="display:none;">
+            <div class="panel-title">✈️ 911技能</div>
+            <button class="skill-btn" id="planeSkillBtn" onclick="usePlaneSkill()" data-desc="神风特攻：飞机构直击一个敌方棋子，冷却2回合后自动释放。">✈️ 召唤神风 (冷却:<span id="planeCooldownText">0</span>)</button>
+        </div>
+        <div id="fengPanel" style="display:none;">
+            <div class="panel-title">🐴 冯 <span style="font-size:13px;font-weight:normal;color:#795548;"></span></div>
+            <button class="skill-btn" id="fengDawaBtn" onclick="useFengDawa()" data-desc="打瓦：在己方河内两个空位各降下一匹冯马。">⚔️ 打瓦 </button>
+            <button class="skill-btn" id="fengDuqiaoBtn" onclick="useFengDuqiao()" style="margin-top:6px;" data-desc="堵桥：清除敌方所有马匹。">🌉 堵桥 </button>
+        </div>
+        <div id="richPanel" style="display:none;">
+            <div class="panel-title">💰 富翁</div>
+            <div style="margin-bottom:8px;">🪙 银币: <span id="silverText">0</span> 💰 金币: <span id="goldText">0</span></div>
+            <button class="skill-btn" id="placeGoldBtn" onclick="startPlaceGold()" data-desc="消耗1金币：点击空位落金币子，或点击敌军棋子使其变绿（绿色无法移动）。">📌 放置金币</button>
+        </div>
+        <div id="wushuPanel" style="display:none;">
+            <div class="panel-title">🧘 武僧</div>
+            <div class="rage-bar">🔥 怒气: <span id="rageText">0</span> / 15</div>
+            <button class="skill-btn" id="wushuSkillBtn" onclick="useWushuSkill()" data-desc="大威天龙：消耗1怒气，清空己方将帅周围5×5敌方棋子。">🐉 大威天龙 </button>
+            <button class="skill-btn" id="wushuUltimateBtn" onclick="useWushuUltimate()" disabled data-desc="毁天灭地：怒气满15时释放，清空全场直接获胜。">💥 毁天灭地 </button>
+        </div>
+        <div id="engineerPanel" style="display:none;">
+            <div class="panel-title">🛠️ 工兵技能</div>
+            <div style="font-size:13px;margin-bottom:4px;">
+                水平铁路: <span id="engineerHCount">0</span>/<span id="engineerHTotal">10</span> &nbsp;|&nbsp; 垂直: <span id="engineerVCount">0</span>/<span id="engineerVTotal">9</span><br>
+                修建冷却: <span id="buildCooldownText">0</span> 回合
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <button class="skill-btn" id="engineerBuildHBtn" onclick="startBuildRailway('H')" data-desc="修建一条水平铁路（冷却2回合），己方兵可沿铁轨任意移动。">🛤️ 修水平</button>
+                <button class="skill-btn" id="engineerBuildVBtn" onclick="startBuildRailway('V')" data-desc="修建一条垂直铁路（冷却2回合），己方兵可沿铁轨任意移动。">🛤️ 修垂直</button>
+                <button class="skill-btn" id="engineerRemoveHBtn" onclick="startRemoveRailway('H')" data-desc="拆除一条已修建的水平铁路。">❌ 拆水平</button>
+                <button class="skill-btn" id="engineerRemoveVBtn" onclick="startRemoveRailway('V')" data-desc="拆除一条已修建的垂直铁路。">❌ 拆垂直</button>
+            </div>
+        </div>
+        <div id="dunjiaPanel" style="display:none;">
+            <div class="panel-title">🛡️ 遁甲 · 八门</div>
+            <div style="font-size:13px;margin-bottom:4px;">
+                转: <span id="dunjiaZhuanCount">10</span>/10 &nbsp;|&nbsp; 越: <span id="dunjiaYueCount">10</span>/10 &nbsp;|&nbsp; 重冷却: <span id="dunjiaZhongCD">0</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <button class="skill-btn" id="dunjiaGuBtn" onclick="dunjiaGu()" data-desc="固：九宫内所有己方棋子无敌15回合。">固</button>
+                <button class="skill-btn" id="dunjiaJieBtn" onclick="dunjiaJie()" data-desc="接：己方所有兵及相邻己方棋子无敌15回合。">接</button>
+                <button class="skill-btn" id="dunjiaZhuanBtn" onclick="dunjiaZhuan()" data-desc="转：选两个己方棋子交换位置（限10次）。">转</button>
+                <button class="skill-btn" id="dunjiaBiBtn" onclick="dunjiaBi()" data-desc="闭：在己方半场随机放置最多4个棋子防守。">闭</button>
+                <button class="skill-btn" id="dunjiaYinBtn" onclick="dunjiaYin()" data-desc="隐：隐藏一个己方非将帅棋子（不可被吃，再次点击取消）。">隐</button>
+                <button class="skill-btn" id="dunjiaYueBtn" onclick="dunjiaYue()" data-desc="越：将己方棋子瞬移到任意空位（限10次）。">越</button>
+                <button class="skill-btn" id="dunjiaShenBtn" onclick="dunjiaShen()" data-desc="深：底线的己方棋子无敌10回合。">深</button>
+                <button class="skill-btn" id="dunjiaZhongBtn" onclick="dunjiaZhong()" data-desc="重：给己方将帅套盾，被将军时触发，冷却10回合。">重</button>
+            </div>
+        </div>
+        <div id="kongchengPanel" style="display:none;">
+            <div class="panel-title">🏯 空城计</div>
+            <div style="margin-bottom:8px; font-size:15px; font-weight:bold; color:#4a148c;">
+                剩余回合: <span id="kongchengTurnsDisplay">--</span>
+            </div>
+            <div style="font-size:13px; color:#4a148c; background:#f3e5f5; padding:6px; border-radius:8px;">
+                ※ 走位50回合获胜
+            </div>
+        </div>
+        <div id="zhongzhiPanel" style="display:none;">
+            <div class="panel-title">🛡️ 众志成城</div>
+            <div style="font-size:13px; color:#5d4037; background:#efebe9; padding:6px; border-radius:8px; line-height:1.6;">
+                ※ 己方非将帅棋子未吃完前，敌方不能吃将、将军
+            </div>
+            <div style="margin-top:8px; font-size:14px; font-weight:bold; color:#3e2723;">
+                剩余棋子: <span id="zhongzhiCount">--</span>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// ==================== 常量and状态 ====================
+const SPACING = 64, MARGIN = 50, RADIUS = 26, COLS = 9, ROWS = 10;
+const CW = (COLS - 1) * SPACING + MARGIN * 2;
+const CH = (ROWS - 1) * SPACING + MARGIN * 2;
+const canvas = document.getElementById('chessCanvas');
+canvas.width = CW; canvas.height = CH;
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlayText');
+let overlayTimer = null;
+
+const INIT_BOARD = [
+    ['r','n','b','a','k','a','b','n','r'],
+    ['.','.','.','.','.','.','.','.','.'],
+    ['.','c','.','.','.','.','.','c','.'],
+    ['p','.','p','.','p','.','p','.','p'],
+    ['.','.','.','.','.','.','.','.','.'],
+    ['.','.','.','.','.','.','.','.','.'],
+    ['P','.','P','.','P','.','P','.','P'],
+    ['.','C','.','.','.','.','.','C','.'],
+    ['.','.','.','.','.','.','.','.','.'],
+    ['R','N','B','A','K','A','B','N','R']
+];
+
+let board = [], turn = 'red', selectedRow = -1, selectedCol = -1;
+let gameOver = false, aiEnabled = true, playerColor = null, aiColor = null;
+let aiThinking = false, animating = false;
+let legalMovesForSelected = [];
+let heroType = null;
+let aiHeroType = null;
+let gameMode = null;
+
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let hand = [], maxSlots = 7, discardIdx = -1;
+let bombActive = false, tripleActive = false;
+let fighterCooldown = 0;
+let goldHighlight = null, shockwaveRing = null, shockwaveAnimFrame = null;
+let yunCooldown = 0, yunAnimation = null, yunSelecting = false;
+let qimenUsed = {};
+let planeAnimation = null, planeCooldown = 0;
+let fengDawaUsed = false, fengDuqiaoUsed = false;
+let silverCoins = 0, goldCoins = 0, placingGold = false, turnCount = 0;
+let greenPieces = new Set();
+let rage = 0;
+const MAX_RAGE = 15;
+let bridges = [true, true, true, true, true, true, true, true, true];
+let aiTurnCounter = 0;
+let buildingBridge = false;
+let railwayH = new Set();
+let railwayV = new Set();
+let engineerTurnCounter = 0;
+const RAIL_SQUARE = SPACING / 5;
+let playerBuildCooldown = 0;
+let playerRailwayMode = null;
+let aiFighterCooldown = 0;
+let aiYunCooldown = 0;
+let aiPlaneCooldown = 0;
+let dihuTurnCounter = 0;
+let dihuAnim = null;
+
+let kongchengActive = false, kongchengTurns = 0, kongchengUsedBy = null;
+
+let zhongzhiPlayerActive = false, zhongzhiAiActive = false;
+
+let invincibleMap = new Map();
+let hiddenPiece = null;
+let dunJiaZhongShield = false;
+let dunJiaZhongCooldown = 0;
+let dunJiaZhuanCount = 10;
+let dunJiaYueCount = 10;
+let dunJiaSelecting = null;
+let dunJiaSelectedPiece = null;
+let oppDunJiaZhongShield = false;
+
+// ==================== 联机对战状态 ====================
+let isOnline = false;
+let isOnlineHost = false;
+let onlinePeerConn = null;
+let onlineDataChannel = null;
+let onlineMyColor = null;
+let onlineOppColor = null;
+let onlineSideChosen = false;
+let onlineOppSideChosen = false;
+let onlineHeroChosen = false;
+let onlineOppHeroChosen = false;
+let onlineConnected = false;
+let onlineOppHero = null;
+let onlineRestartPending = false;
+
+const PIECE_NAMES = { r:'车', n:'马', b:'象', a:'士', k:'将', c:'炮', p:'卒', R:'車', N:'馬', B:'相', A:'仕', K:'帥', C:'炮', P:'兵', G:'金', g:'金' };
+const PIECE_VALUES = { r:9, n:4, b:2, a:2, k:100, c:4.5, p:1, R:9, N:4, B:2, A:2, K:100, C:4.5, P:1, G:2, g:2 };
+
+const PAWN_POS_RED = [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,1,1,1,0,0,0],[0,0,0,2,3,2,0,0,0],[0,0,1,3,4,3,1,0,0],[0,0,1,3,5,3,1,0,0],[0,0,1,2,3,2,1,0,0]];
+const HORSE_POS_RED = [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,1,0,0,0,0],[0,0,0,1,2,1,0,0,0],[0,0,1,2,3,2,1,0,0],[0,0,1,2,3,2,1,0,0],[0,0,1,2,3,2,1,0,0],[0,0,0,1,2,1,0,0,0],[0,0,0,0,1,0,0,0,0],[0,0,0,0,0,0,0,0,0]];
+const CANNON_POS_RED = [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,1,1,1,1,1,0,0],[0,0,1,2,2,2,1,0,0],[0,0,1,2,3,2,1,0,0],[0,0,1,2,3,2,1,0,0],[0,0,1,2,3,2,1,0,0],[0,0,1,2,2,2,1,0,0],[0,0,1,1,1,1,1,0,0],[0,0,0,0,0,0,0,0,0]];
+
+function getPosVal(piece,row,col) {
+    const lower = piece.toLowerCase();
+    const color = piece === piece.toUpperCase() ? 'red' : 'black';
+    const r = color === 'red' ? row : 9 - row;
+    if (lower === 'p') return PAWN_POS_RED[r]?.[col] || 0;
+    if (lower === 'n') return HORSE_POS_RED[r]?.[col] || 0;
+    if (lower === 'c') return CANNON_POS_RED[r]?.[col] || 0;
+    return 0;
+}
+function rnd(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function showOverlay(text, color, dur=0) {
+    if (overlayTimer) clearTimeout(overlayTimer);
+    overlay.style.opacity = '1';
+    overlay.textContent = text;
+    overlay.style.color = color;
+    if (dur > 0) overlayTimer = setTimeout(() => { overlay.style.opacity = '0'; overlayTimer = null; }, dur);
+}
+function clearOverlay() { if (overlayTimer) clearTimeout(overlayTimer); overlay.style.opacity = '0'; overlay.textContent = ''; }
+function aiSay(text, cls='system') {
+    const box = document.getElementById('aiLogBox');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${cls}`;
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+    while (box.children.length > 80) box.removeChild(box.firstChild);
+}
+function getCross(row,col) { return { x: MARGIN + col * SPACING, y: MARGIN + row * SPACING }; }
+function getRowCol(px,py) {
+    const col = Math.round((px - MARGIN) / SPACING), row = Math.round((py - MARGIN) / SPACING);
+    if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null;
+    const { x, y } = getCross(row, col);
+    return Math.hypot(px - x, py - y) <= RADIUS + 6 ? { row, col } : null;
+}
+const getColor = p => p === '.' ? null : p === p.toUpperCase() ? 'red' : 'black';
+const inBoard = (r,c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
+
+function findKing(color) {
+    const t = color === 'red' ? 'K' : 'k';
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c] === t) return [r,c];
+    return null;
+}
+
+function isZhongzhiColor(color) {
+    if (color === playerColor && zhongzhiPlayerActive) return true;
+    if (color === aiColor && zhongzhiAiActive) return true;
+    return false;
+}
+function canEatKing(defenderColor) {
+    if (!isZhongzhiColor(defenderColor)) return true;
+    return countNonKingPieces(defenderColor) === 0;
+}
+function countNonKingPieces(color) {
+    let n = 0;
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) {
+        const p = board[r][c];
+        if (p !== '.' && getColor(p) === color && p.toLowerCase() !== 'k') n++;
+    }
+    return n;
+}
+
+function isInvincible(row, col) {
+    const key = `${row},${col}`;
+    if (invincibleMap.has(key) && invincibleMap.get(key) > 0) return true;
+    if (hiddenPiece === key) return true;
+    return false;
+}
+function isInvincibleByShield(row, col) {
+    const p = board[row][col];
+    if (p === '.') return false;
+    if (p.toLowerCase() === 'k') {
+        if (getColor(p) === playerColor && dunJiaZhongShield) return true;
+        if (getColor(p) === aiColor && oppDunJiaZhongShield) return true;
+    }
+    return false;
+}
+
+// ==================超级绘制！====================
+function drawPiece(p, x, y) {
+    const isRed = p === p.toUpperCase();
+    let isGreen = false;
+    if (p !== '.' && p.toLowerCase() !== 'k' && p.toLowerCase() !== 'g') {
+        const row = Math.round((y - MARGIN) / SPACING), col = Math.round((x - MARGIN) / SPACING);
+        if (greenPieces.has(`${row},${col}`)) isGreen = true;
+    }
+    const row = Math.round((y - MARGIN) / SPACING), col = Math.round((x - MARGIN) / SPACING);
+    const invincible = isInvincible(row, col);
+    const isHidden = hiddenPiece === `${row},${col}`;
+    const isTelecom = telecomActive && p !== '.' && p.toLowerCase() === 'k' && getColor(p) === playerColor;
+
+    ctx.beginPath(); ctx.arc(x+2, y+2, RADIUS, 0, Math.PI*2); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, RADIUS, 0, Math.PI*2);
+    const grad = ctx.createRadialGradient(x-4, y-4, 2, x, y, RADIUS);
+    if (isHidden) { grad.addColorStop(0, '#e0f2f1'); grad.addColorStop(1, '#004d40'); }
+    else if (isTelecom) { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#e8f0fe'); }
+    else if (invincible) { grad.addColorStop(0, '#fff8e1'); grad.addColorStop(1, '#f9a825'); }
+    else if (isGreen) { grad.addColorStop(0, '#c8e6c9'); grad.addColorStop(1, '#2e7d32'); }
+    else if (p.toLowerCase() === 'g') { grad.addColorStop(0, '#fff9c4'); grad.addColorStop(1, isRed ? '#f9a825' : '#f57f17'); }
+    else { grad.addColorStop(0, isRed ? '#ffcdd2' : '#bbdefb'); grad.addColorStop(1, isRed ? '#b71c1c' : '#0d47a1'); }
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = isTelecom ? '#0058b8' : (invincible ? '#f57f17' : (isHidden ? '#004d40' : '#3e2723'));
+    ctx.lineWidth = invincible ? 3 : 2; ctx.stroke();
+    if (invincible && !isHidden) {
+        ctx.beginPath(); ctx.arc(x, y, RADIUS+6, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,180,0,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (isHidden) {
+        ctx.beginPath(); ctx.arc(x, y, RADIUS+6, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(0,77,64,0.6)'; ctx.lineWidth = 2; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (isTelecom) {
+        if (telecomLogoImg && telecomLogoImg.complete && telecomLogoImg.naturalWidth > 0) {
+            ctx.save();
+            ctx.beginPath(); ctx.arc(x, y, RADIUS, 0, Math.PI*2); ctx.clip();
+            ctx.drawImage(telecomLogoImg, x - RADIUS, y - RADIUS, RADIUS*2, RADIUS*2);
+            ctx.restore();
+        } else {
+            ctx.fillStyle = '#0058b8';
+            ctx.font = 'bold 22px "KaiTi","楷体"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('📶', x, y);
+        }
+    } else {
+        ctx.fillStyle = isRed ? '#ffebee' : '#e3f2fd';
+        ctx.font = 'bold 24px "KaiTi","楷体"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        let name = PIECE_NAMES[p] || p;
+        if (heroType === 'feng' && p.toLowerCase() === 'n' && getColor(p) === playerColor) name = '冯';
+        ctx.fillText(name, x, y);
+    }
+
+    if (dihuAnim) {
+        const key = `${row},${col}`;
+        const isHighlight = (dihuAnim.phase === 1 && dihuAnim.mainCells.has(key)) || (dihuAnim.phase === 2 && dihuAnim.spreadCells.has(key));
+        if (isHighlight) {
+            ctx.save();
+            ctx.beginPath(); ctx.arc(x, y, RADIUS+6, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(200,0,0,0.9)'; ctx.lineWidth = 4; ctx.setLineDash([5,5]); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x, y, RADIUS+2, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(255,80,0,0.8)'; ctx.lineWidth = 3; ctx.setLineDash([]); ctx.stroke();
+            ctx.restore();
+        }
+    }
+}
+
+function drawBase(skipR, skipC) {
+    ctx.clearRect(0, 0, CW, CH);
+    ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 1.5;
+    for (let r=0; r<ROWS; r++) { ctx.beginPath(); ctx.moveTo(MARGIN, MARGIN + r*SPACING); ctx.lineTo(MARGIN + 8*SPACING, MARGIN + r*SPACING); ctx.stroke(); }
+    for (let c=0; c<COLS; c++) { const x = MARGIN + c*SPACING; ctx.beginPath(); ctx.moveTo(x, MARGIN); ctx.lineTo(x, MARGIN + 4*SPACING); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, MARGIN + 5*SPACING); ctx.lineTo(x, MARGIN + 9*SPACING); ctx.stroke(); }
+    ctx.strokeRect(MARGIN, MARGIN, 8*SPACING, 9*SPACING);
+    ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 1;
+    const drawDiag = (sr, sc) => { const lx = MARGIN + sc*SPACING, rx = MARGIN + (sc+2)*SPACING, ty = MARGIN + sr*SPACING, by = MARGIN + (sr+2)*SPACING; ctx.beginPath(); ctx.moveTo(lx, ty); ctx.lineTo(rx, by); ctx.stroke(); ctx.beginPath(); ctx.moveTo(rx, ty); ctx.lineTo(lx, by); ctx.stroke(); };
+    drawDiag(0,3); drawDiag(7,3);
+    ctx.fillStyle = '#3e2723'; ctx.font = 'italic 28px "KaiTi"'; ctx.textAlign = 'center';
+    ctx.fillText('楚  河', MARGIN + 2.5*SPACING, MARGIN + 4.5*SPACING + 8);
+    ctx.fillText('汉  界', MARGIN + 5.5*SPACING, MARGIN + 4.5*SPACING + 8);
+
+    if (aiHeroType === 'bridge') {
+        const bridgeWidth = SPACING * 0.45, bridgeHeight = SPACING / 4, startY = MARGIN + 4 * SPACING;
+        for (let c=0; c<COLS; c++) if (bridges[c]) { const x = MARGIN + c*SPACING - bridgeWidth/2; for (let i=0; i<4; i++) { const y = startY + i * bridgeHeight; ctx.fillStyle = '#1565c0'; ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 4; ctx.fillRect(x, y, bridgeWidth, bridgeHeight); ctx.shadowBlur = 0; ctx.strokeStyle = '#0d47a1'; ctx.lineWidth = 1; ctx.strokeRect(x, y, bridgeWidth, bridgeHeight); } }
+    }
+    if (railwayH.size > 0 || railwayV.size > 0) {
+        const s = RAIL_SQUARE;
+        for (let r of railwayH) { const y = MARGIN + r * SPACING - s/2; for (let x = MARGIN - s/2; x <= MARGIN + 8*SPACING + s/2; x += s) { const idx = Math.round((x - (MARGIN - s/2)) / s); const isBlack = (idx + r) % 2 === 0; ctx.fillStyle = isBlack ? '#333333' : '#ffffff'; ctx.fillRect(x, y, s, s); ctx.strokeStyle = '#666'; ctx.lineWidth = 0.5; ctx.strokeRect(x, y, s, s); } }
+        for (let c of railwayV) { const x = MARGIN + c * SPACING - s/2; for (let y = MARGIN - s/2; y <= MARGIN + 9*SPACING + s/2; y += s) { const idx = Math.round((y - (MARGIN - s/2)) / s); const isBlack = (idx + c) % 2 === 0; ctx.fillStyle = isBlack ? '#333333' : '#ffffff'; ctx.fillRect(x, y, s, s); ctx.strokeStyle = '#666'; ctx.lineWidth = 0.5; ctx.strokeRect(x, y, s, s); } }
+    }
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { if (r === skipR && c === skipC) continue; if (board[r][c] !== '.') drawPiece(board[r][c], ...Object.values(getCross(r,c))); }
+    if (bombActive && heroType === 'gambler') { for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p = board[r][c]; if (p !== '.' && p.toLowerCase() !== 'k' && getColor(p) !== playerColor) { const {x,y} = getCross(r,c); ctx.beginPath(); ctx.arc(x, y, RADIUS+4, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,0,0,0.7)'; ctx.lineWidth = 3; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]); } } }
+    if (tripleActive && heroType === 'gambler') { for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p = board[r][c]; if (p !== '.' && p.toLowerCase() !== 'k' && getColor(p) !== playerColor) { const {x,y} = getCross(r,c); ctx.beginPath(); ctx.arc(x, y, RADIUS+4, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,215,0,0.9)'; ctx.lineWidth = 3; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]); } } }
+    if (placingGold && heroType === 'rich') { const opp = playerColor === 'red' ? 'black' : 'red'; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p = board[r][c]; const isTarget = (p === '.') || (getColor(p) === opp && p.toLowerCase() !== 'k' && p.toLowerCase() !== 'r' && p.toLowerCase() !== 'c' && !greenPieces.has(`${r},${c}`)); if (isTarget) { const {x,y} = getCross(r,c); ctx.beginPath(); ctx.arc(x, y, RADIUS+4, 0, Math.PI*2); ctx.strokeStyle = 'rgba(249,168,37,0.8)'; ctx.lineWidth = 2.5; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]); } } }
+    if (dunJiaSelecting === 'zhuan1' || dunJiaSelecting === 'zhuan2') { const my = playerColor; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p = board[r][c]; if (p !== '.' && getColor(p) === my && p.toLowerCase() !== 'k' && !greenPieces.has(`${r},${c}`)) { const {x,y} = getCross(r,c); ctx.beginPath(); ctx.arc(x, y, RADIUS+4, 0, Math.PI*2); ctx.strokeStyle = 'rgba(0,150,136,0.7)'; ctx.lineWidth = 3; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]); } } }
+    if (shockwaveRing) { const elapsed = Date.now() - shockwaveRing.startTime; if (elapsed >= shockwaveRing.duration) { shockwaveRing = null; } else { const progress = elapsed / shockwaveRing.duration; const radius = progress * shockwaveRing.maxRadius; const alpha = 1 - progress; ctx.beginPath(); ctx.arc(shockwaveRing.x, shockwaveRing.y, radius, 0, Math.PI*2); ctx.strokeStyle = `rgba(255,${shockwaveRing.color==='gold'?215:80},0,${alpha})`; ctx.lineWidth = 6; ctx.stroke(); } }
+    if (yunAnimation) { const col = yunAnimation.col; const barX = MARGIN + col*SPACING - SPACING*0.4, barY = MARGIN + yunAnimation.y - SPACING*0.8; ctx.fillStyle = 'rgba(255,0,0,0.55)'; ctx.fillRect(barX, barY, SPACING*0.8, SPACING*1.6); }
+    if (planeAnimation) { const {x,y} = planeAnimation; ctx.save(); ctx.font = '30px "KaiTi"'; ctx.fillStyle = '#c62828'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✈️', x, y); ctx.fillStyle = 'rgba(255,200,0,0.8)'; ctx.beginPath(); ctx.arc(x-12, y+5, 6, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+}
+
+function drawBoard() { drawBase(); if (selectedRow !== -1 && legalMovesForSelected.length && !animating && !dunJiaSelecting && !placingGold && !dihuAnim) { const piece = board[selectedRow]?.[selectedCol]; const isFighterKing = heroType === 'fighter' && piece && piece.toLowerCase() === 'k' && getColor(piece) === playerColor; legalMovesForSelected.forEach(t => { const {x,y} = getCross(t.row, t.col); ctx.beginPath(); ctx.arc(x, y, 12, 0, 2*Math.PI); ctx.fillStyle = isFighterKing ? 'rgba(255,215,0,0.55)' : 'rgba(0,200,0,0.4)'; ctx.fill(); ctx.strokeStyle = isFighterKing ? 'rgba(200,150,0,0.8)' : 'rgba(0,100,0,0.6)'; ctx.lineWidth = isFighterKing ? 3 : 2; ctx.stroke(); }); const {x,y} = getCross(selectedRow, selectedCol); ctx.beginPath(); ctx.arc(x, y, RADIUS+4, 0, 2*Math.PI); ctx.strokeStyle = isFighterKing ? '#ff6d00' : '#ff9800'; ctx.lineWidth = isFighterKing ? 5 : 4; ctx.stroke(); } }
+function drawWithout(r,c) { drawBase(r,c); }
+
+function canReachByRail(r1,c1,r2,c2) {
+    if (r1===r2 && c1===c2) return true;
+    function lineClear(rA,cA,rB,cB) { if (rA===rB) { if (!railwayH.has(rA)) return false; const minC=Math.min(cA,cB), maxC=Math.max(cA,cB); for (let c=minC+1; c<maxC; c++) if (board[rA][c]!=='.') return false; return true; } else if (cA===cB) { if (!railwayV.has(cA)) return false; const minR=Math.min(rA,rB), maxR=Math.max(rA,rB); for (let r=minR+1; r<maxR; r++) if (board[r][cA]!=='.') return false; return true; } return false; }
+    if (lineClear(r1,c1,r2,c2)) return true;
+    if (railwayH.has(r1) && railwayV.has(c2) && lineClear(r1,c1,r1,c2) && lineClear(r1,c2,r2,c2)) return true;
+    if (railwayV.has(c1) && railwayH.has(r2) && lineClear(r1,c1,r2,c1) && lineClear(r2,c1,r2,c2)) return true;
+    return false;
+}
+
+function basicMoveCheck(p, r1, c1, r2, c2) {
+    if (!inBoard(r2,c2)) return false;
+    if (greenPieces.has(`${r1},${c1}`)) return false;
+    const target = board[r2][c2], color = getColor(p), type = p.toLowerCase(), dr = r2-r1, dc = c2-c1;
+    if (target !== '.' && getColor(target) === color && target.toLowerCase() !== 'g') return false;
+    if (target !== '.' && target.toLowerCase() === 'k' && !canEatKing(getColor(target))) return false;
+    if (type === 'g') return false;
+    if (target !== '.' && isInvincible(r2, c2)) return false;
+    if (target !== '.' && isInvincibleByShield(r2, c2)) return false;
+    if (aiHeroType === 'bridge' && ((r1===4 && r2===5) || (r1===5 && r2===4)) && !bridges[c1]) return false;
+    if (type === 'p' && ((heroType==='engineer'&&color===playerColor)||(aiHeroType==='engineer'&&color===aiColor)) && canReachByRail(r1,c1,r2,c2)) return true;
+    if (type === 'r') { if (dr&&dc) return false; const sr=dr?(dr>0?1:-1):0, sc=dc?(dc>0?1:-1):0; for (let r=r1+sr, c=c1+sc; r!==r2||c!==c2; r+=sr, c+=sc) if (board[r][c]!=='.') return false; return true; }
+    if (type === 'n') { if (heroType==='feng'&&color===playerColor) { const adr=Math.abs(dr), adc=Math.abs(dc); return (adr===1&&adc===2)||(adr===2&&adc===1)||(adr===2&&adc===4)||(adr===4&&adc===2)||(adr===2&&adc===2); } if (!((Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2))) return false; const lr=Math.abs(dr)===2?r1+(dr>0?1:-1):r1, lc=Math.abs(dc)===2?c1+(dc>0?1:-1):c1; return board[lr][lc]==='.'; }
+    if (type === 'b') { if (Math.abs(dr)!==2||Math.abs(dc)!==2) return false; if ((color==='red'&&r2<5)||(color==='black'&&r2>4)) return false; return board[(r1+r2)/2][(c1+c2)/2]==='.'; }
+    if (type === 'a') { if (Math.abs(dr)!==1||Math.abs(dc)!==1) return false; const okR=color==='red'?(r2>=7&&r2<=9):(r2>=0&&r2<=2); return okR&&c2>=3&&c2<=5; }
+    if (type === 'k') { if (heroType==='wushu'&&color===playerColor) { const adr=Math.abs(dr), adc=Math.abs(dc); if ((adr===1&&adc===0)||(adr===0&&adc===1)||(adr===1&&adc===1)) return true; return false; } if (heroType==='fighter'&&color===playerColor) { const adr=Math.abs(dr), adc=Math.abs(dc); if (adr+adc===1) return true; if (adr+adc===2&&(dr===0||dc===0)) return true; if (adr===1&&adc===1) return true; return false; } if (Math.abs(dr)+Math.abs(dc)!==1) return false; const okR=color==='red'?(r2>=7&&r2<=9):(r2>=0&&r2<=2); return okR&&c2>=3&&c2<=5; }
+    if (type === 'c') { if (dr&&dc) return false; const sr=dr?(dr>0?1:-1):0, sc=dc?(dc>0?1:-1):0; let cnt=0; for (let r=r1+sr, c=c1+sc; r!==r2||c!==c2; r+=sr, c+=sc) if (board[r][c]!=='.') cnt++; return target==='.'?cnt===0:cnt===1; }
+    if (type === 'p') { if (color==='red') return r1>4?(dc===0&&dr===-1):((dc===0&&dr===-1)||(dr===0&&Math.abs(dc)===1)); else return r1<5?(dc===0&&dr===1):((dc===0&&dr===1)||(dr===0&&Math.abs(dc)===1)); }
+    return false;
+}
+
+function isChecked(color) {
+    if (isZhongzhiColor(color) && countNonKingPieces(color) > 0) return false;
+    const kp = findKing(color); if (!kp) return false;
+    const [kr,kc] = kp, opp = color==='red'?'black':'red';
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]!=='.' && getColor(board[r][c])===opp && !greenPieces.has(`${r},${c}`) && basicMoveCheck(board[r][c], r, c, kr, kc)) return true;
+    const oppKing = color==='red'?'k':'K';
+    for (let r=0; r<ROWS; r++) if (board[r][kc]===oppKing && !greenPieces.has(`${r},${kc}`)) { let blocked=false; for (let rr=Math.min(r,kr)+1; rr<Math.max(r,kr); rr++) if (board[rr][kc]!=='.') { blocked=true; break; } if (!blocked) return true; }
+    return false;
+}
+
+function moveCausesSelfCheck(r1,c1,r2,c2,color) {
+    const orig = board.map(r=>[...r]), origGreen = new Set(greenPieces);
+    board[r2][c2]=board[r1][c1]; board[r1][c1]='.';
+    if (greenPieces.has(`${r1},${c1}`)) { greenPieces.delete(`${r1},${c1}`); greenPieces.add(`${r2},${c2}`); }
+    const checked = isChecked(color); board=orig; greenPieces=origGreen; return checked;
+}
+
+function getLegalMoves(r,c) {
+    const p=board[r][c]; if (p==='.' || greenPieces.has(`${r},${c}`)) return [];
+    const color=getColor(p), moves=[];
+    for (let r2=0; r2<ROWS; r2++) for (let c2=0; c2<COLS; c2++) {
+        if (r2===r && c2===c) continue;
+        if (basicMoveCheck(p,r,c,r2,c2) && !moveCausesSelfCheck(r,c,r2,c2,color)) moves.push({row:r2, col:c2});
+    }
+    return moves;
+}
+
+function getAllMoves(color) {
+    const moves=[];
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p==='.'||getColor(p)!==color||greenPieces.has(`${r},${c}`)) continue; for (let r2=0; r2<ROWS; r2++) for (let c2=0; c2<COLS; c2++) { if (r2===r&&c2===c) continue; if (basicMoveCheck(p,r,c,r2,c2) && !moveCausesSelfCheck(r,c,r2,c2,color)) moves.push({fromRow:r, fromCol:c, toRow:r2, toCol:c2, piece:p}); } }
+    return moves;
+}
+
+function hasLegalMove(color) {
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p==='.'||getColor(p)!==color||greenPieces.has(`${r},${c}`)) continue; for (let r2=0; r2<ROWS; r2++) for (let c2=0; c2<COLS; c2++) { if (r2===r&&c2===c) continue; if (basicMoveCheck(p,r,c,r2,c2) && !moveCausesSelfCheck(r,c,r2,c2,color)) return true; } }
+    return false;
+}
+
+function checkGameEnd(activeColor) {
+    if (gameOver) return true;
+    const opp=activeColor==='red'?'black':'red';
+    const ak=findKing(activeColor), ok=findKing(opp);
+    if (!ok) { gameOver=true; turn=activeColor; showOverlay('敌方将帅已失！', activeColor==='red'?'#b71c1c':'#1a237e',0); drawBoard(); updateStatus(); return true; }
+    if (!ak) { gameOver=true; turn=opp; showOverlay('己方将帅已失！', opp==='red'?'#b71c1c':'#1a237e',0); drawBoard(); updateStatus(); return true; }
+    if (!hasLegalMove(opp)) { gameOver=true; turn=activeColor; showOverlay('将死 无解', activeColor==='red'?'#b71c1c':'#1a237e',0); drawBoard(); updateStatus(); return true; }
+    if (isChecked(opp)) showOverlay('将军', '#b71c1c', 2000); else clearOverlay();
+    return false;
+}
+
+function tickInvincibility() {
+    const toRemove=[];
+    for (let [key,turns] of invincibleMap) { if (turns<=1) toRemove.push(key); else invincibleMap.set(key,turns-1); }
+    for (let key of toRemove) invincibleMap.delete(key);
+    if (dunJiaZhongCooldown>0) dunJiaZhongCooldown--;
+}
+
+function afterMove(moverColor) {
+    if (checkGameEnd(moverColor)) return true;
+    if (kongchengActive && kongchengTurns>0) {
+        if (kongchengUsedBy === moverColor) {
+            kongchengTurns--;
+            updateKongchengUI();
+            if (kongchengTurns<=0) {
+                const kingColor = kongchengUsedBy;
+                const king = findKing(kingColor);
+                if (king) { gameOver=true; turn=kingColor; showOverlay('大军已来！', '#4a148c',0); aiSay('🏯 空城计成功！', 'mock'); }
+                drawBoard(); updateStatus(); return true;
+            }
+        }
+    }
+    if (moverColor===playerColor) { if (heroType==='engineer'&&playerBuildCooldown>0) playerBuildCooldown--; tickInvincibility(); if (dunJiaZhongShield && isChecked(playerColor)) { dunJiaZhongShield=false; dunJiaZhongCooldown=10; aiSay('🛡️ 将帅盾被触发！', 'system'); } }
+    if (moverColor===aiColor) { tickAICooldowns(); }
+    turn = moverColor==='red'?'black':'red';
+    return false;
+}
+
+function findPawnAtRiver() {
+    const my=playerColor;
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p==='.'||getColor(p)!==my) continue; if (p.toLowerCase()==='p') { if (my==='red'&&r===5) return {row:r,col:c}; if (my==='black'&&r===4) return {row:r,col:c}; } }
+    return null;
+}
+
+function startBuildBridge() { if (gameOver||animating||turn!==playerColor||aiThinking) return; const pawn=findPawnAtRiver(); if (!pawn) { aiSay('没有己方兵在河沿！', 'system'); return; } buildingBridge=true; aiSay('🌉 点击棋盘上在河沿的己方兵来建桥', 'system'); drawBoard(); }
+function tryBuildBridge(row,col) { if (!buildingBridge) return false; const p=board[row][col]; if (p==='.'||getColor(p)!==playerColor||p.toLowerCase()!=='p') { buildingBridge=false; aiSay('🌉 已取消建桥', 'system'); drawBoard(); return false; } const my=playerColor; if (!((my==='red'&&row===5)||(my==='black'&&row===4))) { buildingBridge=false; aiSay('❌ 该兵不在河沿！', 'system'); drawBoard(); return false; } if (!bridges[col]) { bridges[col]=true; buildingBridge=false; aiSay(`🌉 第${col+1}列桥已重建！`, 'system'); drawBoard(); endPlayerTurn(); return true; } else { buildingBridge=false; aiSay('🌉 该列桥已存在！', 'system'); drawBoard(); return false; } }
+
+function endPlayerTurn() { const moverColor=playerColor; const gameEnded=afterMove(moverColor); drawBoard(); updateStatus(); if (!gameEnded && turn===aiColor && aiEnabled) scheduleAiMove(); if (!gameEnded && isOnline && turn===onlineOppColor) { sendOnline({type:'state', state: serializeGameState()}); } updateAllSkillUI(); updateDunJiaUI(); updateKongchengUI(); }
+
+function aiRemoveBridge() { if (aiHeroType!=='bridge') return; const available=bridges.map((v,i)=>v?i:-1).filter(i=>i>=0); if (available.length===0) return; const idx=rnd(available); bridges[idx]=false; aiSay(`🌉 人机拆桥（第${idx+1}列）`, 'system'); drawBoard(); }
+function aiBuildRailway() { if (aiHeroType!=='engineer') return; const isH=Math.random()<0.5; let built=false; if (isH) { const av=[]; for (let r=0; r<ROWS; r++) if (!railwayH.has(r)) av.push(r); if (av.length) { const r=rnd(av); railwayH.add(r); aiSay(`🛤️ AI修建水平铁路（第${r}行）`, 'system'); built=true; } } else { const av=[]; for (let c=0; c<COLS; c++) if (!railwayV.has(c)) av.push(c); if (av.length) { const c=rnd(av); railwayV.add(c); aiSay(`🛤️ AI修建垂直铁路（第${c}列）`, 'system'); built=true; } } if (!built) aiSay('🛤️ AI铁路已满', 'system'); drawBoard(); updateEngineerUI(); }
+
+function aiUseFighterSkill() { if (aiHeroType!=='fighter'||aiFighterCooldown>0||gameOver||animating) return; const kp=findKing(aiColor); if (!kp) return; const [kr,kc]=kp; shockwaveRing={x:MARGIN+kc*SPACING, y:MARGIN+kr*SPACING, startTime:Date.now(), duration:700, maxRadius:SPACING*3.8, color:'orange'}; startShockwaveAnimation(); for (let dr=-2; dr<=2; dr++) for (let dc=-2; dc<=2; dc++) { const r=kr+dr, c=kc+dc; if (inBoard(r,c)&&board[r][c]!=='.'&&getColor(board[r][c])!==aiColor&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) board[r][c]='.'; } aiFighterCooldown=5; drawBoard(); aiSay('💥 AI拳皇霸气侧漏！', 'angry'); checkGameEnd(aiColor); updateAllSkillUI(); }
+function aiUseYunSkill() { if (aiHeroType!=='yun'||aiYunCooldown>0||gameOver||animating) return; const col=Math.floor(Math.random()*COLS); aiSay(`🚀 AI大运瞄准第${col+1}列`, 'system'); for (let r=0; r<ROWS; r++) if (board[r][col]!=='.'&&board[r][col].toLowerCase()!=='k'&&!isInvincible(r,col)&&!isInvincibleByShield(r,col)) board[r][col]='.'; aiYunCooldown=9; drawBoard(); aiSay('🚀 大运清列！', 'angry'); checkGameEnd(aiColor); updateAllSkillUI(); }
+function aiUsePlaneSkill() { if (aiHeroType!=='plane'||aiPlaneCooldown>0||gameOver||animating) return; const opp=aiColor==='red'?'black':'red'; const targets=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]!=='.'&&getColor(board[r][c])===opp&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) targets.push({row:r,col:c}); if (!targets.length) { aiSay('✈️ AI911无目标', 'system'); return; } const t=rnd(targets); aiSay('✈️ 天道黑卡板载！', 'system'); showOverlay('天道黑卡板载！', '#c62828', 1800); const startX=MARGIN+Math.random()*(8*SPACING), startY=-20; const targetX=MARGIN+t.col*SPACING, targetY=MARGIN+t.row*SPACING; planeAnimation={startX,startY,x:startX,y:startY,targetX,targetY,targetRow:t.row,targetCol:t.col,startTime:performance.now(),duration:700}; animating=true; requestAnimationFrame(aiPlaneStep); }
+function aiPlaneStep(now) { if (!planeAnimation) { animating=false; drawBoard(); return; } const elapsed=now-planeAnimation.startTime, prog=Math.min(elapsed/planeAnimation.duration,1); planeAnimation.x=planeAnimation.startX+(planeAnimation.targetX-planeAnimation.startX)*prog; planeAnimation.y=planeAnimation.startY+(planeAnimation.targetY-planeAnimation.startY)*prog; drawBoard(); if (prog<1) requestAnimationFrame(aiPlaneStep); else { const {targetRow,targetCol}=planeAnimation; if (board[targetRow][targetCol]!=='.'&&board[targetRow][targetCol].toLowerCase()!=='k'&&!isInvincible(targetRow,targetCol)&&!isInvincibleByShield(targetRow,targetCol)) board[targetRow][targetCol]='.'; planeAnimation=null; animating=false; aiPlaneCooldown=2; drawBoard(); aiSay('💥 AI911命中！', 'angry'); if (!checkGameEnd(aiColor)) { afterMove(aiColor); drawBoard(); updateStatus(); if (turn===playerColor) { turnCount++; tickCooldowns(); updateAllSkillUI(); checkBuildBridgeButton(); updateDunJiaUI(); updateKongchengUI(); } if (turn===aiColor&&aiEnabled) scheduleAiMove(); } } }
+
+function aiUseDihuSkill() { if (aiHeroType!=='dihu'||gameOver||animating) return; const row=Math.floor(Math.random()*ROWS), col=Math.floor(Math.random()*COLS); aiSay(`🔥 地火在 (${row},${col}) 爆发！`, 'angry'); showOverlay('地火！', '#d84315', 1500); const mainCells=new Set(); for (let dr=-1; dr<=1; dr++) for (let dc=-1; dc<=1; dc++) { if (Math.abs(dr)+Math.abs(dc)!==1) continue; const r=row+dr, c=col+dc; if (inBoard(r,c)&&board[r][c]!=='.'&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) mainCells.add(`${r},${c}`); } if (mainCells.size===0) { aiSay('🔥 地火范围内无棋子', 'system'); return; } dihuAnim={phase:1, mainCells, spreadCells:new Set(), startTime:Date.now()}; animating=true; setTimeout(()=>{ for (let key of mainCells) { const [r,c]=key.split(',').map(Number); if (board[r][c]!=='.') { if (greenPieces.has(key)) greenPieces.delete(key); board[r][c]='.'; } } const spreadSet=new Set(); for (let key of mainCells) { const [r,c]=key.split(',').map(Number); for (let [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nr=r+dr, nc=c+dc; const nkey=`${nr},${nc}`; if (inBoard(nr,nc)&&board[nr][nc]!=='.'&&board[nr][nc].toLowerCase()!=='k'&&!isInvincible(nr,nc)&&!isInvincibleByShield(nr,nc)) spreadSet.add(nkey); } } dihuAnim.phase=2; dihuAnim.spreadCells=spreadSet; dihuAnim.startTime=Date.now(); drawBoard(); setTimeout(()=>{ for (let key of spreadSet) { const [r,c]=key.split(',').map(Number); if (board[r][c]!=='.') { if (greenPieces.has(key)) greenPieces.delete(key); board[r][c]='.'; } } dihuAnim=null; animating=false; drawBoard(); aiSay('🔥 地火焚烧完毕！', 'system'); if (!checkGameEnd(aiColor)) { afterMove(aiColor); drawBoard(); updateStatus(); if (turn===playerColor) { turnCount++; tickCooldowns(); updateAllSkillUI(); checkBuildBridgeButton(); updateDunJiaUI(); updateKongchengUI(); } if (turn===aiColor&&aiEnabled) scheduleAiMove(); } }, 2000); }, 2000); drawBoard(); }
+
+function tickAICooldowns() { if (aiFighterCooldown>0) aiFighterCooldown--; if (aiYunCooldown>0) aiYunCooldown--; if (aiPlaneCooldown>0) aiPlaneCooldown--; }
+
+function startBuildRailway(d) { if (heroType!=='engineer'||gameOver||turn!==playerColor||animating||aiThinking) return; if (playerBuildCooldown>0) { aiSay(`⏳ 冷却中 (${playerBuildCooldown})`, 'system'); return; } if (d==='H'&&railwayH.size>=ROWS) { aiSay('🛤️ 水平铁路已满', 'system'); return; } if (d==='V'&&railwayV.size>=COLS) { aiSay('🛤️ 垂直铁路已满', 'system'); return; } playerRailwayMode=d==='H'?'buildH':'buildV'; aiSay(`🛤️ 点击棋盘选择${d==='H'?'行':'列'}修建`, 'system'); drawBoard(); }
+function startRemoveRailway(d) { if (heroType!=='engineer'||gameOver||turn!==playerColor||animating||aiThinking) return; if (d==='H'&&railwayH.size===0) { aiSay('❌ 无水平铁路', 'system'); return; } if (d==='V'&&railwayV.size===0) { aiSay('❌ 无垂直铁路', 'system'); return; } playerRailwayMode=d==='H'?'removeH':'removeV'; aiSay(`❌ 点击棋盘选择${d==='H'?'行':'列'}拆除`, 'system'); drawBoard(); }
+function executePlayerRailway(row,col) { if (!playerRailwayMode) return; const mode=playerRailwayMode; playerRailwayMode=null; let success=false; if (mode==='buildH') { if (railwayH.has(row)) aiSay(`❌ 第${row}行已有`, 'system'); else { railwayH.add(row); aiSay(`🛤️ 修建水平铁路（第${row}行）`, 'system'); success=true; playerBuildCooldown=2; } } else if (mode==='buildV') { if (railwayV.has(col)) aiSay(`❌ 第${col}列已有`, 'system'); else { railwayV.add(col); aiSay(`🛤️ 修建垂直铁路（第${col}列）`, 'system'); success=true; playerBuildCooldown=2; } } else if (mode==='removeH') { if (!railwayH.has(row)) aiSay(`❌ 第${row}行不存在`, 'system'); else { railwayH.delete(row); aiSay(`❌ 拆除水平铁路（第${row}行）`, 'system'); success=true; } } else if (mode==='removeV') { if (!railwayV.has(col)) aiSay(`❌ 第${col}列不存在`, 'system'); else { railwayV.delete(col); aiSay(`❌ 拆除垂直铁路（第${col}列）`, 'system'); success=true; } } drawBoard(); updateEngineerUI(); if (success) { if (isOnline) sendOnline({type:'state', state: serializeGameState()}); if (mode.startsWith('remove')) endPlayerTurn(); else updateAllSkillUI(); } else { drawBoard(); updateAllSkillUI(); } }
+function updateEngineerUI() { document.getElementById('engineerHCount').textContent=railwayH.size; document.getElementById('engineerVCount').textContent=railwayV.size; document.getElementById('buildCooldownText').textContent=playerBuildCooldown; }
+
+function updateInvincibleKey(oldR, oldC, newR, newC) { const oldKey=`${oldR},${oldC}`; const newKey=`${newR},${newC}`; if (invincibleMap.has(oldKey)) { invincibleMap.set(newKey, invincibleMap.get(oldKey)); invincibleMap.delete(oldKey); } if (hiddenPiece===oldKey) hiddenPiece=newKey; }
+
+function tryMove(r1,c1,r2,c2) {
+    if (gameOver||aiThinking||animating) return false;
+    if (buildingBridge||bombActive||tripleActive||yunSelecting||playerRailwayMode||placingGold||dunJiaSelecting) return false;
+    const fr=selectedRow, fc=selectedCol;
+    const piece=board[r1][c1]; if (piece==='.'||getColor(piece)!==turn||greenPieces.has(`${r1},${c1}`)) return false;
+    if (!basicMoveCheck(piece,r1,c1,r2,c2)||moveCausesSelfCheck(r1,c1,r2,c2,getColor(piece))) return false;
+    const target=board[r2][c2]; board[r2][c2]=piece; board[r1][c1]='.';
+    if (greenPieces.has(`${r1},${c1}`)) greenPieces.delete(`${r1},${c1}`); if (greenPieces.has(`${r2},${c2}`)) greenPieces.delete(`${r2},${c2}`);
+    updateInvincibleKey(r1,c1,r2,c2); selectedRow=selectedCol=-1; legalMovesForSelected=[];
+    const moverColor=getColor(piece);
+    if (target!=='.'&&getColor(target)!==moverColor&&moverColor===playerColor&&heroType==='rich'&&target.toLowerCase()!=='g') { silverCoins++; updateRichUI(); autoConvertCoins(); }
+    const gameEnded=afterMove(moverColor);
+    if (target!=='.'&&getColor(target)!==moverColor&&moverColor===playerColor&&heroType==='gambler') incSlots();
+    drawBoard(); updateStatus();
+    if (isOnline) { sendOnline({type:'move', from:[fr,fc], to:[r2,c2], piece, captured:target}); sendOnline({type:'state', state: serializeGameState()}); }
+    if (!gameEnded&&turn===playerColor) { turnCount++; if (heroType==='rich'&&turnCount%2===0) { silverCoins++; updateRichUI(); autoConvertCoins(); } tickCooldowns(); if (heroType==='gambler') autoDraw(); updateAllSkillUI(); checkBuildBridgeButton(); updateDunJiaUI(); updateKongchengUI(); }
+    if (!gameEnded&&turn===aiColor&&aiEnabled) scheduleAiMove();
+    return true;
+}
+
+function animateMove(fr,fc,tr,tc,piece,captured,cb) { animating=true; const start=getCross(fr,fc), end=getCross(tr,tc); const dur=200, st=performance.now(); function step(now) { const t=Math.min((now-st)/dur,1); const cx=start.x+(end.x-start.x)*t, cy=start.y+(end.y-start.y)*t; drawWithout(fr,fc); drawPiece(piece,cx,cy); if (t<1) requestAnimationFrame(step); else { board[tr][tc]=piece; board[fr][fc]='.'; if (greenPieces.has(`${fr},${fc}`)) greenPieces.delete(`${fr},${fc}`); if (greenPieces.has(`${tr},${tc}`)) greenPieces.delete(`${tr},${tc}`); updateInvincibleKey(fr,fc,tr,tc); animating=false; if (!isOnline && captured!=='.'&&getColor(captured)!==aiColor) aiSay(rnd(INSULTS),'angry'); drawBoard(); cb(); } } requestAnimationFrame(step); }
+function evalBoard(color) {
+    let score = 0; const opp = color==='red'?'black':'red';
+    for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) {
+        const p = board[r][c]; if (p==='.') continue; const val = PIECE_VALUES[p]||0, pos = getPosVal(p,r,c);
+        const sign = (getColor(p)===color)?1:-1; score += sign * (val + pos*0.15);
+    }
+    if (isChecked(opp)) score += 8; if (isChecked(color)) score -= 8; return score;
+}
+
+function minimax(depth, alpha, beta, maximizing, color) {
+    if (depth === 0 || gameOver) return evalBoard(color);
+    const cur = maximizing ? color : (color==='red'?'black':'red'); const moves = getAllMoves(cur);
+    if (!moves.length) return maximizing ? -99999 : 99999;
+    moves.sort((a,b)=>{ const va=board[a.toRow][a.toCol]!=='.'?PIECE_VALUES[board[a.toRow][a.toCol]]||0:0; const vb=board[b.toRow][b.toCol]!=='.'?PIECE_VALUES[board[b.toRow][b.toCol]]||0:0; return vb-va; });
+    if (maximizing) {
+        let maxEval = -Infinity;
+        for (const m of moves) {
+            const bak=board.map(r=>[...r]); const bakGreen=new Set(greenPieces); const bakInv=new Map(invincibleMap); const bakHidden=hiddenPiece;
+            board[m.toRow][m.toCol]=m.piece; board[m.fromRow][m.fromCol]='.';
+            if (greenPieces.has(`${m.fromRow},${m.fromCol}`)) { greenPieces.delete(`${m.fromRow},${m.fromCol}`); greenPieces.add(`${m.toRow},${m.toCol}`); }
+            updateInvincibleKey(m.fromRow,m.fromCol,m.toRow,m.toCol);
+            const val = minimax(depth-1, alpha, beta, false, color);
+            board=bak; greenPieces=bakGreen; invincibleMap=bakInv; hiddenPiece=bakHidden;
+            maxEval = Math.max(maxEval, val); alpha = Math.max(alpha, val); if (beta <= alpha) break;
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        for (const m of moves) {
+            const bak=board.map(r=>[...r]); const bakGreen=new Set(greenPieces); const bakInv=new Map(invincibleMap); const bakHidden=hiddenPiece;
+            board[m.toRow][m.toCol]=m.piece; board[m.fromRow][m.fromCol]='.';
+            if (greenPieces.has(`${m.fromRow},${m.fromCol}`)) { greenPieces.delete(`${m.fromRow},${m.fromCol}`); greenPieces.add(`${m.toRow},${m.toCol}`); }
+            updateInvincibleKey(m.fromRow,m.fromCol,m.toRow,m.toCol);
+            const val = minimax(depth-1, alpha, beta, true, color);
+            board=bak; greenPieces=bakGreen; invincibleMap=bakInv; hiddenPiece=bakHidden;
+            minEval = Math.min(minEval, val); beta = Math.min(beta, val); if (beta <= alpha) break;
+        }
+        return minEval;
+    }
+}
+
+function selectBestMove() {
+    const moves = getAllMoves(aiColor); if (!moves.length) return null;
+    moves.sort((a,b)=>{ const va=board[a.toRow][a.toCol]!=='.'?PIECE_VALUES[board[a.toRow][a.toCol]]||0:0; const vb=board[b.toRow][b.toCol]!=='.'?PIECE_VALUES[board[b.toRow][b.toCol]]||0:0; return vb-va; });
+    let bestScore = -Infinity, best = [];
+    const searchDepth = (gameMode === 'skill') ? 2 : 3;
+    for (const m of moves) {
+        const bak=board.map(r=>[...r]); const bakGreen=new Set(greenPieces); const bakInv=new Map(invincibleMap); const bakHidden=hiddenPiece;
+        board[m.toRow][m.toCol]=m.piece; board[m.fromRow][m.fromCol]='.';
+        if (greenPieces.has(`${m.fromRow},${m.fromCol}`)) { greenPieces.delete(`${m.fromRow},${m.fromCol}`); greenPieces.add(`${m.toRow},${m.toCol}`); }
+        updateInvincibleKey(m.fromRow,m.fromCol,m.toRow,m.toCol);
+        const score = minimax(searchDepth, -Infinity, Infinity, false, aiColor);
+        board=bak; greenPieces=bakGreen; invincibleMap=bakInv; hiddenPiece=bakHidden;
+        if (score > bestScore) { bestScore = score; best = [m]; } else if (score === bestScore) best.push(m);
+    }
+    return rnd(best);
+}
+
+function performAiMove() {
+    if (gameOver || turn !== aiColor || !aiEnabled) { aiThinking = false; return; }
+    if (aiHeroType==='bridge') { aiTurnCounter++; if (aiTurnCounter%4===0) aiRemoveBridge(); }
+    if (aiHeroType==='engineer') { engineerTurnCounter++; if (engineerTurnCounter%2===0) aiBuildRailway(); }
+    if (aiHeroType==='dihu') { dihuTurnCounter++; if (dihuTurnCounter%7===0 && !animating && !gameOver) { aiUseDihuSkill(); aiThinking=false; return; } }
+    if (aiHeroType==='fighter' && aiFighterCooldown===0 && !gameOver && !animating) { if (Math.random()<0.5) { aiUseFighterSkill(); aiThinking=false; return; } }
+    if (aiHeroType==='yun' && aiYunCooldown===0 && !gameOver && !animating) { if (Math.random()<0.4) { aiUseYunSkill(); aiThinking=false; return; } }
+    if (aiHeroType==='plane' && aiPlaneCooldown===0 && !gameOver && !animating) {
+        let hasTarget=false; const opp=aiColor==='red'?'black':'red';
+        for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) { if (board[r][c]!=='.' && getColor(board[r][c])===opp && board[r][c].toLowerCase()!=='k' && !isInvincible(r,c) && !isInvincibleByShield(r,c)) { hasTarget=true; break; } }
+        if (hasTarget) { aiUsePlaneSkill(); aiThinking=false; return; }
+    }
+    aiThinking = true; updateStatus(); const move = selectBestMove();
+    if (!move) { gameOver = true; turn = aiColor==='red'?'black':'red'; showOverlay('将死 无解', playerColor==='red'?'#b71c1c':'#1a237e', 0); aiSay(rnd(DEATH_INSULTS), 'angry'); drawBoard(); updateStatus(); aiThinking = false; return; }
+    const captured = board[move.toRow][move.toCol];
+    animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, captured, () => {
+        if (heroType==='wushu' && captured!=='.' && getColor(captured)===playerColor && captured.toLowerCase()!=='k') addRage(1);
+        const gameEnded = afterMove(aiColor); aiThinking = false; drawBoard(); updateStatus();
+        if (!gameEnded && turn===playerColor) { turnCount++; if (heroType==='rich' && turnCount%2===0) { silverCoins++; updateRichUI(); autoConvertCoins(); } tickCooldowns(); if (heroType==='gambler') autoDraw(); updateAllSkillUI(); checkBuildBridgeButton(); updateDunJiaUI(); updateKongchengUI(); }
+    });
+}
+
+function scheduleAiMove() { if (aiThinking || gameOver || animating || turn !== aiColor || !aiEnabled) return; aiThinking = true; updateStatus(); setTimeout(performAiMove, 200); }
+function startShockwaveAnimation() { if (shockwaveAnimFrame) return; function loop() { drawBoard(); if (shockwaveRing) shockwaveAnimFrame = requestAnimationFrame(loop); else shockwaveAnimFrame = null; } shockwaveAnimFrame = requestAnimationFrame(loop); }
+function stopShockwaveAnimation() { if (shockwaveAnimFrame) { cancelAnimationFrame(shockwaveAnimFrame); shockwaveAnimFrame = null; } shockwaveRing = null; }
+function addRage(amount) { if (heroType!=='wushu') return; rage = Math.min(rage+amount, MAX_RAGE); updateWushuUI(); }
+function updateWushuUI() { document.getElementById('rageText').textContent=rage; const sk=document.getElementById('wushuSkillBtn'), uk=document.getElementById('wushuUltimateBtn'); if (sk) sk.disabled=gameOver||turn!==playerColor||animating||rage<1; if (uk) { uk.disabled=gameOver||turn!==playerColor||animating||rage<MAX_RAGE; uk.classList.toggle('ultimate-active', rage>=MAX_RAGE && !uk.disabled); } }
+function useWushuSkill() { if (heroType!=='wushu'||gameOver||turn!==playerColor||animating) return; if (rage<1) { aiSay('🔥 怒气不足！', 'system'); return; } const kp=findKing(playerColor); if (!kp) { aiSay('将帅不在棋盘！', 'system'); return; } const [kr,kc]=kp; shockwaveRing={x:MARGIN+kc*SPACING, y:MARGIN+kr*SPACING, startTime:Date.now(), duration:700, maxRadius:SPACING*3.8, color:'gold'}; startShockwaveAnimation(); showOverlay('大胆！大威天龙', '#f9a825', 1500); let cleared=0; for (let dr=-2; dr<=2; dr++) for (let dc=-2; dc<=2; dc++) { const r=kr+dr, c=kc+dc; if (inBoard(r,c)&&board[r][c]!=='.'&&getColor(board[r][c])!==playerColor&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) { board[r][c]='.'; cleared++; } } rage--; updateWushuUI(); drawBoard(); aiSay(`🐉 大威天龙！清除 ${cleared} 个棋子！`, 'system'); checkGameEnd(playerColor); updateAllSkillUI(); if (!gameOver) endPlayerTurn(); }
+function useWushuUltimate() { if (heroType!=='wushu'||gameOver||turn!==playerColor||animating) return; if (rage<MAX_RAGE) { aiSay('🔥 怒气不足15！', 'system'); return; } for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) board[r][c]='.'; greenPieces.clear(); invincibleMap.clear(); hiddenPiece=null; dunJiaZhongShield=false; gameOver=true; turn=playerColor; showOverlay('毁天灭地！胜利！', '#ff6f00', 0); drawBoard(); updateStatus(); updateAllSkillUI(); }
+function autoConvertCoins() { if (silverCoins>=2) { const gold=Math.floor(silverCoins/2); goldCoins+=gold; silverCoins%=2; updateRichUI(); if (gold>0) aiSay(`💰 兑换 ${gold} 金币！`, 'system'); } }
+function startPlaceGold() { if (heroType!=='rich'||goldCoins<=0||gameOver||turn!==playerColor||animating) return; placingGold=true; aiSay('📌 点击棋盘放置金币', 'system'); drawBoard(); }
+function executePlaceGold(row,col) { placingGold=false; if (goldCoins<=0) { aiSay('❌ 金币不足！', 'system'); drawBoard(); updateRichUI(); return; } const p=board[row][col]; const opp=playerColor==='red'?'black':'red'; if (p==='.') { board[row][col]=playerColor==='red'?'G':'g'; goldCoins--; } else if (getColor(p)===opp&&p.toLowerCase()!=='k'&&p.toLowerCase()!=='r'&&p.toLowerCase()!=='c') { if (greenPieces.has(`${row},${col}`)) { greenPieces.delete(`${row},${col}`); board[row][col]=playerColor==='red'?p.toUpperCase():p.toLowerCase(); } else { greenPieces.add(`${row},${col}`); } goldCoins--; } else { aiSay('❌ 无法放置', 'system'); drawBoard(); updateRichUI(); return; } updateRichUI(); drawBoard(); checkGameEnd(playerColor); updateAllSkillUI(); if (!gameOver) endPlayerTurn(); }
+function updateRichUI() { document.getElementById('silverText').textContent=silverCoins; document.getElementById('goldText').textContent=goldCoins; document.getElementById('placeGoldBtn').disabled=goldCoins<=0||gameOver||turn!==playerColor||animating; }
+function hasBomb() { const cnt={}; hand.forEach(c=>cnt[c]=(cnt[c]||0)+1); return Object.values(cnt).some(v=>v>=4); }
+function getBombRank() { const cnt={}; hand.forEach(c=>cnt[c]=(cnt[c]||0)+1); for (let r in cnt) if (cnt[r]>=4) return r; return null; }
+function hasTriple() { const cnt={}; hand.forEach(c=>cnt[c]=(cnt[c]||0)+1); return Object.values(cnt).some(v=>v>=3); }
+function getTripleRank() { const cnt={}; hand.forEach(c=>cnt[c]=(cnt[c]||0)+1); for (let r in cnt) if (cnt[r]>=3) return r; return null; }
+function updateHandUI() {
+    const cont=document.getElementById('handCards'), discBtn=document.getElementById('discardBtn'), bombBtn=document.getElementById('bombBtn'), tripleBtn=document.getElementById('tripleBtn');
+    cont.innerHTML=''; hand.forEach((c,i)=>{ const div=document.createElement('div'); div.className='card-slot'+(heroType==='gambler'?' discardable':''); div.textContent=c; div.onclick=()=>{ if (heroType==='gambler') { discardIdx=i; discBtn.disabled=false; updateHandUI(); } }; if (i===discardIdx) div.style.border='3px solid red'; cont.appendChild(div); });
+    document.getElementById('handCount').textContent=hand.length; document.getElementById('maxSlots').textContent=maxSlots;
+    discBtn.disabled=!(heroType==='gambler'&&discardIdx>=0); bombBtn.style.display='inline-block'; const hasB=hasBomb(); bombBtn.disabled=!hasB||gameOver||turn!==playerColor||animating||tripleActive; bombBtn.classList.toggle('bomb-active', hasB && !bombBtn.disabled);
+    tripleBtn.style.display='inline-block'; const hasT=hasTriple(); tripleBtn.disabled=!hasT||gameOver||turn!==playerColor||animating||bombActive; tripleBtn.classList.toggle('triple-active', hasT && !tripleBtn.disabled);
+}
+function autoDraw() { if (heroType==='gambler'&&hand.length<maxSlots) { hand.push(rnd(RANKS)); updateHandUI(); } }
+function discardCard() { if (heroType==='gambler'&&discardIdx>=0) { hand.splice(discardIdx,1); discardIdx=-1; updateHandUI(); } }
+function incSlots() { if (maxSlots<18) { maxSlots=Math.min(maxSlots+3,18); updateHandUI(); } }
+function activateBomb() { if (heroType!=='gambler'||gameOver||turn!==playerColor||animating) return; if (!hasBomb()) { aiSay('💣 没有炸弹牌！', 'system'); return; } if (tripleActive) { tripleActive=false; updateHandUI(); } bombActive=!bombActive; if (bombActive) { aiSay('💣 点击棋盘选择2×2炸弹中心', 'system'); drawBoard(); updateHandUI(); } else { drawBoard(); updateHandUI(); } }
+function useBomb(row,col) { if (!bombActive) return; const rank=getBombRank(); if (!rank) { bombActive=false; aiSay('❌ 没有炸弹牌！', 'system'); updateHandUI(); drawBoard(); return; } let rem=0; for (let i=hand.length-1; i>=0; i--) if (hand[i]===rank&&rem<4) { hand.splice(i,1); rem++; } bombActive=false; let cleared=0; for (let dr=0; dr<=1; dr++) for (let dc=0; dc<=1; dc++) { const r=row+dr, c=col+dc; if (inBoard(r,c)&&board[r][c]!=='.'&&board[r][c].toLowerCase()!=='k'&&getColor(board[r][c])!==playerColor&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) { board[r][c]='.'; cleared++; } } updateHandUI(); drawBoard(); aiSay(`💥 炸弹！清除 ${cleared} 棋子`, 'angry'); checkGameEnd(playerColor); updateAllSkillUI(); if (!gameOver) endPlayerTurn(); }
+function activateTriple() { if (heroType!=='gambler'||gameOver||turn!==playerColor||animating) return; if (!hasTriple()) { aiSay('🎯 没有三带一牌！', 'system'); return; } if (bombActive) { bombActive=false; updateHandUI(); drawBoard(); } tripleActive=!tripleActive; if (tripleActive) { aiSay('🎯 点击敌方非将帅棋子消灭', 'system'); drawBoard(); updateHandUI(); } else { drawBoard(); updateHandUI(); } }
+function useTriple(row,col) { if (!tripleActive) return; const p=board[row][col]; if (p==='.'||p.toLowerCase()==='k'||getColor(p)===playerColor) { aiSay('❌ 目标无效', 'system'); drawBoard(); return; } if (isInvincible(row,col)||isInvincibleByShield(row,col)) { aiSay('❌ 目标无敌', 'system'); drawBoard(); return; } const rank=getTripleRank(); if (!rank) { tripleActive=false; aiSay('❌ 无三带一牌', 'system'); updateHandUI(); drawBoard(); return; } let rem=0; for (let i=hand.length-1; i>=0; i--) if (hand[i]===rank&&rem<3) { hand.splice(i,1); rem++; } if (greenPieces.has(`${row},${col}`)) greenPieces.delete(`${row},${col}`); board[row][col]='.'; tripleActive=false; updateHandUI(); drawBoard(); aiSay('🎯 三带一！', 'angry'); checkGameEnd(playerColor); updateAllSkillUI(); if (!gameOver) endPlayerTurn(); }
+
+function useFighterSkill() { if (heroType!=='fighter'||fighterCooldown>0||gameOver||turn!==playerColor||animating) return; const kp=findKing(playerColor); if (!kp) return; const [kr,kc]=kp; shockwaveRing={x:MARGIN+kc*SPACING, y:MARGIN+kr*SPACING, startTime:Date.now(), duration:700, maxRadius:SPACING*3.8, color:'orange'}; startShockwaveAnimation(); showOverlay('霸气侧漏！', '#ff6d00', 1500); setTimeout(()=>{ let cleared=0; for (let dr=-2; dr<=2; dr++) for (let dc=-2; dc<=2; dc++) { const r=kr+dr, c=kc+dc; if (inBoard(r,c)&&board[r][c]!=='.'&&getColor(board[r][c])!==playerColor&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) { board[r][c]='.'; cleared++; } } fighterCooldown=5; updateCooldownBtn(); drawBoard(); aiSay(`💥 清除 ${cleared} 个敌方棋子！`, 'system'); checkGameEnd(playerColor); updateAllSkillUI(); if (!gameOver) endPlayerTurn(); }, 750); }
+function updateCooldownBtn() { const btn=document.getElementById('fighterSkillBtn'); if (btn) { document.getElementById('cooldownText').textContent=fighterCooldown; btn.disabled=fighterCooldown>0||gameOver||turn!==playerColor||animating; } }
+function tickFighterCooldown() { if (heroType==='fighter'&&fighterCooldown>0) { fighterCooldown--; updateCooldownBtn(); } }
+
+function useYunSkill() { if (heroType!=='yun'||yunCooldown>0||gameOver||turn!==playerColor||animating) return; aiSay('🚀 点击棋盘选择一列', 'system'); yunSelecting=true; }
+function triggerYun(col) { yunSelecting=false; yunAnimation={col, y:0, startTime:performance.now(), duration:800}; animating=true; requestAnimationFrame(yunStep); }
+function yunStep(now) { if (!yunAnimation) { animating=false; drawBoard(); return; } const el=now-yunAnimation.startTime, prog=Math.min(el/yunAnimation.duration,1); yunAnimation.y=prog*(ROWS-1)*SPACING; drawBoard(); if (prog<1) requestAnimationFrame(yunStep); else { const col=yunAnimation.col; for (let r=0; r<ROWS; r++) if (board[r][col]!=='.'&&board[r][col].toLowerCase()!=='k'&&!isInvincible(r,col)&&!isInvincibleByShield(r,col)) board[r][col]='.'; yunAnimation=null; animating=false; yunCooldown=9; drawBoard(); aiSay('🚀 大运清列！', 'angry'); checkGameEnd(playerColor); if (!gameOver) endPlayerTurn(); } }
+function updateYunCooldownBtn() { const btn=document.getElementById('yunSkillBtn'); if (btn) { document.getElementById('yunCooldownText').textContent=yunCooldown; btn.disabled=yunCooldown>0||gameOver||turn!==playerColor||animating; } }
+function tickYunCooldown() { if (heroType==='yun'&&yunCooldown>0) { yunCooldown--; updateYunCooldownBtn(); } }
+
+function usePlaneSkill() { if (heroType!=='911'||planeCooldown>0||gameOver||turn!==playerColor||animating) return; const opp=playerColor==='red'?'black':'red'; const targets=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]!=='.'&&getColor(board[r][c])===opp&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)&&!isInvincibleByShield(r,c)) targets.push({row:r,col:c}); if (!targets.length) { aiSay('✈️ 无目标', 'system'); return; } const t=rnd(targets); aiSay('✈️ 天道黑卡板载！', 'system'); showOverlay('天道黑卡板载！', '#c62828', 1800); const startX=MARGIN+Math.random()*(8*SPACING), startY=-20; const targetX=MARGIN+t.col*SPACING, targetY=MARGIN+t.row*SPACING; planeAnimation={startX,startY,x:startX,y:startY,targetX,targetY,targetRow:t.row,targetCol:t.col,startTime:performance.now(),duration:700}; animating=true; requestAnimationFrame(planeStep); }
+function planeStep(now) { if (!planeAnimation) { animating=false; drawBoard(); return; } const elapsed=now-planeAnimation.startTime, prog=Math.min(elapsed/planeAnimation.duration,1); planeAnimation.x=planeAnimation.startX+(planeAnimation.targetX-planeAnimation.startX)*prog; planeAnimation.y=planeAnimation.startY+(planeAnimation.targetY-planeAnimation.startY)*prog; drawBoard(); if (prog<1) requestAnimationFrame(planeStep); else { const {targetRow,targetCol}=planeAnimation; if (board[targetRow][targetCol]!=='.'&&board[targetRow][targetCol].toLowerCase()!=='k'&&!isInvincible(targetRow,targetCol)&&!isInvincibleByShield(targetRow,targetCol)) board[targetRow][targetCol]='.'; planeAnimation=null; animating=false; planeCooldown=2; drawBoard(); aiSay('💥 飞机命中！', 'angry'); checkGameEnd(playerColor); if (!gameOver) endPlayerTurn(); } }
+function updatePlaneCooldownBtn() { const btn=document.getElementById('planeSkillBtn'); if (btn) { document.getElementById('planeCooldownText').textContent=planeCooldown; btn.disabled=planeCooldown>0||gameOver||turn!==playerColor||animating; } }
+function tickPlaneCooldown() { if (heroType==='911'&&planeCooldown>0) { planeCooldown--; updatePlaneCooldownBtn(); } }
+
+function useFengDawa() { if (heroType!=='feng'||fengDawaUsed||gameOver||turn!==playerColor||animating) return; const my=playerColor; const empties=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]==='.'&&((my==='red'&&r>=5)||(my==='black'&&r<=4))) empties.push({row:r,col:c}); if (empties.length<2) { aiSay('🐴 己方河内空位不足！', 'system'); return; } const p1=empties.splice(Math.floor(Math.random()*empties.length),1)[0]; const p2=empties[Math.floor(Math.random()*empties.length)]; board[p1.row][p1.col]=my==='red'?'N':'n'; board[p2.row][p2.col]=my==='red'?'N':'n'; fengDawaUsed=true; updateFengSkillBtns(); drawBoard(); aiSay('⚔️ 打瓦！两个冯已降临！', 'system'); checkGameEnd(playerColor); if (!gameOver) endPlayerTurn(); }
+function useFengDuqiao() { if (heroType!=='feng'||fengDuqiaoUsed||gameOver||turn!==playerColor||animating) return; const opp=playerColor==='red'?'black':'red'; let removed=false; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]!=='.'&&board[r][c].toLowerCase()==='n'&&getColor(board[r][c])===opp&&!isInvincible(r,c)) { board[r][c]='.'; removed=true; } if (!removed) { aiSay('🌉 敌方无马！', 'system'); return; } fengDuqiaoUsed=true; updateFengSkillBtns(); drawBoard(); aiSay('🌉 堵桥！敌方马匹尽失！', 'system'); checkGameEnd(playerColor); if (!gameOver) endPlayerTurn(); }
+function updateFengSkillBtns() { document.getElementById('fengDawaBtn').disabled=fengDawaUsed||gameOver||turn!==playerColor||animating; document.getElementById('fengDuqiaoBtn').disabled=fengDuqiaoUsed||gameOver||turn!==playerColor||animating; }
+
+function qimen(skill) { if (heroType!=='qimen'||qimenUsed[skill]||gameOver||turn!==playerColor||animating) return; qimenUsed[skill]=true; const btnId='qimen'+(skill==='jing2'?'Jing2':skill.charAt(0).toUpperCase()+skill.slice(1)); document.getElementById(btnId).disabled=true; const my=playerColor, opp=my==='red'?'black':'red'; if (skill==='xiu') { for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p!=='.'&&getColor(p)===my&&((my==='red'&&r<5)||(my==='black'&&r>4))) { board[r][c]='.'; let nr,nc; if (my==='red') { do { nr=5+Math.floor(Math.random()*5); nc=Math.floor(Math.random()*9); } while (board[nr][nc]!=='.'); } else { do { nr=Math.floor(Math.random()*5); nc=Math.floor(Math.random()*9); } while (board[nr][nc]!=='.'); } board[nr][nc]=p; } } } else if (skill==='sheng') { for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const ip=INIT_BOARD[r][c]; if (ip!=='.'&&getColor(ip)===my) board[r][c]=ip; } } else if (skill==='shang') { const t=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]!=='.'&&getColor(board[r][c])===opp&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)) t.push({r,c}); if (t.length) { const tt=rnd(t); board[tt.r][tt.c]='.'; } } else if (skill==='du') { const e=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]==='.') e.push({r,c}); if (e.length) { const ee=rnd(e); board[ee.r][ee.c]=my==='red'?'R':'r'; } } else if (skill==='jing') { const e=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) if (board[r][c]==='.') e.push({r,c}); if (e.length) { const ee=rnd(e); board[ee.r][ee.c]=my==='red'?'C':'c'; } } else if (skill==='si') { if (Math.random()<0.5) { const kp=findKing(opp); if (kp) board[kp[0]][kp[1]]='.'; gameOver=true; turn=my; showOverlay('死门！敌方将死', my==='red'?'#b71c1c':'#1a237e',0); drawBoard(); updateStatus(); return; } else { const kp=findKing(my); if (kp) board[kp[0]][kp[1]]='.'; gameOver=true; turn=opp; showOverlay('死门！己方将死', opp==='red'?'#b71c1c':'#1a237e',0); drawBoard(); updateStatus(); return; } } else if (skill==='jing2') { for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p!=='.'&&getColor(p)===opp&&((opp==='red'&&r<5)||(opp==='black'&&r>4))&&!isInvincible(r,c)) { board[r][c]='.'; let nr,nc; if (opp==='red') { do { nr=5+Math.floor(Math.random()*5); nc=Math.floor(Math.random()*9); } while (board[nr][nc]!=='.'); } else { do { nr=Math.floor(Math.random()*5); nc=Math.floor(Math.random()*9); } while (board[nr][nc]!=='.'); } board[nr][nc]=p; } } } else if (skill==='kai') { const mk=findKing(my), ok=findKing(opp); if (mk) { const r=mk[0]+(my==='red'?-1:1), c=mk[1]; if (inBoard(r,c)&&board[r][c]!=='.'&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)) board[r][c]='.'; } if (ok) { const r=ok[0]+(opp==='red'?-1:1), c=ok[1]; if (inBoard(r,c)&&board[r][c]!=='.'&&board[r][c].toLowerCase()!=='k'&&!isInvincible(r,c)) board[r][c]='.'; } } drawBoard(); if (!gameOver) { aiSay(`奇门 · ${skill} 发动！`, 'system'); checkGameEnd(playerColor); if (!gameOver) endPlayerTurn(); } }
+
+function tickCooldowns() { tickFighterCooldown(); tickYunCooldown(); tickPlaneCooldown(); if (heroType==='911' && planeCooldown===0 && !gameOver && !animating && turn===playerColor) { setTimeout(()=>{ if (heroType==='911' && planeCooldown===0 && !gameOver && !animating && turn===playerColor) usePlaneSkill(); }, 800); } if (heroType==='qimen') updateSkillPanels(); if (heroType==='feng') updateFengSkillBtns(); }
+
+function dunjiaGu() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; const my=playerColor; const {rMin,rMax,cMin,cMax}=getPalaceRange(my); let count=0; for (let r=rMin; r<=rMax; r++) for (let c=cMin; c<=cMax; c++) { const p=board[r][c]; if (p!=='.'&&getColor(p)===my) { invincibleMap.set(`${r},${c}`,15); count++; } } aiSay(`固：${count}个棋子无敌15回合`, 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); }
+function dunjiaJie() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; const my=playerColor; let count=0; const marked=new Set(); for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p!=='.'&&getColor(p)===my&&p.toLowerCase()==='p') { const key=`${r},${c}`; if (!marked.has(key)) { invincibleMap.set(key,15); marked.add(key); count++; } for (let dc2=-1; dc2<=1; dc2+=2) { const nc=c+dc2; if (inBoard(r,nc)&&board[r][nc]!=='.'&&getColor(board[r][nc])===my) { const nkey=`${r},${nc}`; if (!marked.has(nkey)) { invincibleMap.set(nkey,15); marked.add(nkey); count++; } } } } } aiSay(`接：${count}个棋子无敌15回合`, 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); }
+function dunjiaZhuan() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; if (dunJiaZhuanCount<=0) { aiSay('转次数已用完', 'system'); return; } if (dunJiaSelecting==='zhuan1'||dunJiaSelecting==='zhuan2') { dunJiaSelecting=null; dunJiaSelectedPiece=null; aiSay('已取消转', 'system'); drawBoard(); return; } dunJiaSelecting='zhuan1'; dunJiaSelectedPiece=null; aiSay('点击选择第一个己方棋子（除将帅）', 'system'); drawBoard(); }
+function executeZhuan(row,col) { const my=playerColor; const p=board[row][col]; if (p==='.'||getColor(p)!==my||p.toLowerCase()==='k'||greenPieces.has(`${row},${col}`)) { aiSay('❌ 无效棋子', 'system'); drawBoard(); return; } if (dunJiaSelecting==='zhuan1') { dunJiaSelectedPiece={row,col}; dunJiaSelecting='zhuan2'; aiSay('选择第二个棋子交换', 'system'); drawBoard(); } else if (dunJiaSelecting==='zhuan2') { if (row===dunJiaSelectedPiece.row&&col===dunJiaSelectedPiece.col) { aiSay('不能选择同一棋子', 'system'); return; } const p1=board[dunJiaSelectedPiece.row][dunJiaSelectedPiece.col]; const p2=board[row][col]; board[dunJiaSelectedPiece.row][dunJiaSelectedPiece.col]=p2; board[row][col]=p1; const key1=`${dunJiaSelectedPiece.row},${dunJiaSelectedPiece.col}`; const key2=`${row},${col}`; const inv1=invincibleMap.get(key1); const inv2=invincibleMap.get(key2); if (inv1!==undefined) invincibleMap.set(key2,inv1); else invincibleMap.delete(key2); if (inv2!==undefined) invincibleMap.set(key1,inv2); else invincibleMap.delete(key1); if (hiddenPiece===key1) hiddenPiece=key2; else if (hiddenPiece===key2) hiddenPiece=key1; dunJiaZhuanCount--; dunJiaSelecting=null; dunJiaSelectedPiece=null; aiSay('交换成功！', 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); } }
+function dunjiaBi() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; const my=playerColor; const kp=findKing(my); if (!kp) return; const [kr,kc]=kp; const candidates=[]; if (my==='red') { for (let r=5; r<kr; r++) for (let c=0; c<COLS; c++) if (board[r][c]==='.') candidates.push({row:r,col:c}); } else { for (let r=kr+1; r<=4; r++) for (let c=0; c<COLS; c++) if (board[r][c]==='.') candidates.push({row:r,col:c}); } if (candidates.length===0) { aiSay('闭：无空位', 'system'); return; } const pieceTypes=my==='red'?['R','C','P']:['r','c','p']; const maxPlace=Math.min(4, candidates.length); const selected=[]; for (let i=0; i<maxPlace; i++) { const idx=Math.floor(Math.random()*candidates.length); selected.push(candidates.splice(idx,1)[0]); } for (const pos of selected) board[pos.row][pos.col]=rnd(pieceTypes); aiSay(`闭：放置${selected.length}个棋子`, 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); }
+function dunjiaYin() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; if (hiddenPiece!==null) { aiSay('已有隐藏棋子', 'system'); return; } if (dunJiaSelecting==='yin') { dunJiaSelecting=null; aiSay('已取消隐', 'system'); drawBoard(); return; } dunJiaSelecting='yin'; aiSay('选择一个己方非将帅棋子隐藏', 'system'); drawBoard(); }
+function executeYin(row,col) { const my=playerColor; const p=board[row][col]; if (p==='.'||getColor(p)!==my||p.toLowerCase()==='k'||greenPieces.has(`${row},${col}`)) { aiSay('❌ 无效棋子', 'system'); drawBoard(); return; } hiddenPiece=`${row},${col}`; dunJiaSelecting=null; aiSay('棋子已隐藏！', 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); }
+function dunjiaYue() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; if (dunJiaYueCount<=0) { aiSay('越次数已用完', 'system'); return; } if (dunJiaSelecting==='yue1'||dunJiaSelecting==='yue2') { dunJiaSelecting=null; dunJiaSelectedPiece=null; aiSay('已取消越', 'system'); drawBoard(); return; } dunJiaSelecting='yue1'; dunJiaSelectedPiece=null; aiSay('选择棋子，再选择空位移动', 'system'); drawBoard(); }
+function executeYue(row,col) { const my=playerColor; if (dunJiaSelecting==='yue1') { const p=board[row][col]; if (p==='.'||getColor(p)!==my||p.toLowerCase()==='k'||greenPieces.has(`${row},${col}`)) { aiSay('❌ 无效棋子', 'system'); drawBoard(); return; } dunJiaSelectedPiece={row,col}; dunJiaSelecting='yue2'; aiSay('选择空位移动', 'system'); drawBoard(); } else if (dunJiaSelecting==='yue2') { if (board[row][col]!=='.') { aiSay('❌ 请选择空位', 'system'); return; } const fr=dunJiaSelectedPiece.row, fc=dunJiaSelectedPiece.col; const piece=board[fr][fc]; board[row][col]=piece; board[fr][fc]='.'; updateInvincibleKey(fr,fc,row,col); dunJiaYueCount--; dunJiaSelecting=null; dunJiaSelectedPiece=null; aiSay('移动成功！', 'system'); drawBoard(); updateDunJiaUI(); checkGameEnd(playerColor); if (!gameOver) endPlayerTurn(); } }
+function dunjiaShen() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; const my=playerColor; const bottomRow=my==='red'?9:0; let count=0; for (let c=0; c<COLS; c++) { const p=board[bottomRow][c]; if (p!=='.'&&getColor(p)===my) { invincibleMap.set(`${bottomRow},${c}`,10); count++; } } aiSay(`深：${count}个棋子无敌10回合`, 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); }
+function dunjiaZhong() { if (heroType!=='dunjia'||gameOver||turn!==playerColor||animating||aiThinking) return; if (dunJiaZhongCooldown>0) { aiSay(`重冷却中 (${dunJiaZhongCooldown})`, 'system'); return; } if (dunJiaZhongShield) { aiSay('已有盾', 'system'); return; } dunJiaZhongShield=true; dunJiaZhongCooldown=10; aiSay('🛡将帅套盾！', 'system'); drawBoard(); updateDunJiaUI(); if (!gameOver) endPlayerTurn(); }
+function getPalaceRange(color) { return color==='red'?{rMin:7,rMax:9,cMin:3,cMax:5}:{rMin:0,rMax:2,cMin:3,cMax:5}; }
+function updateDunJiaUI() {
+    document.getElementById('dunjiaZhuanCount').textContent=dunJiaZhuanCount; document.getElementById('dunjiaYueCount').textContent=dunJiaYueCount; document.getElementById('dunjiaZhongCD').textContent=dunJiaZhongCooldown;
+    const canUse=!gameOver&&turn===playerColor&&!animating&&!aiThinking;
+    document.getElementById('dunjiaGuBtn').disabled=!canUse; document.getElementById('dunjiaJieBtn').disabled=!canUse;
+    document.getElementById('dunjiaZhuanBtn').disabled=!canUse||dunJiaZhuanCount<=0; document.getElementById('dunjiaBiBtn').disabled=!canUse;
+    document.getElementById('dunjiaYinBtn').disabled=!canUse||hiddenPiece!==null; document.getElementById('dunjiaYueBtn').disabled=!canUse||dunJiaYueCount<=0;
+    document.getElementById('dunjiaShenBtn').disabled=!canUse; document.getElementById('dunjiaZhongBtn').disabled=!canUse||dunJiaZhongCooldown>0||dunJiaZhongShield;
+}
+function updateKongchengUI() { const disp=document.getElementById('kongchengTurnsDisplay'); if (disp) disp.textContent=kongchengActive?kongchengTurns:'--'; }
+function updateZhongzhiUI() { const disp=document.getElementById('zhongzhiCount'); if (disp) { if (zhongzhiPlayerActive) disp.textContent=countNonKingPieces(playerColor); else if (zhongzhiAiActive) disp.textContent=countNonKingPieces(aiColor); else disp.textContent='--'; } }
+function updateAllSkillUI() { updateHandUI(); updateCooldownBtn(); updateYunCooldownBtn(); updatePlaneCooldownBtn(); updateFengSkillBtns(); updateRichUI(); updateWushuUI(); updateSkillPanels(); checkBuildBridgeButton(); updateEngineerUI(); updateDunJiaUI(); updateKongchengUI(); updateZhongzhiUI(); }
+function updateSkillPanels() {
+    const chatPanel=document.getElementById('chatPanel');
+    const p={hand:document.getElementById('handPanel'),fighter:document.getElementById('fighterPanel'),yun:document.getElementById('yunPanel'),qimen:document.getElementById('qimenPanel'),plane:document.getElementById('planePanel'),feng:document.getElementById('fengPanel'),rich:document.getElementById('richPanel'),wushu:document.getElementById('wushuPanel'),engineer:document.getElementById('engineerPanel'),dunjia:document.getElementById('dunjiaPanel'),kongcheng:document.getElementById('kongchengPanel'),zhongzhi:document.getElementById('zhongzhiPanel')};
+    if (gameMode==='normal') { chatPanel.style.display='flex'; for (let k in p) p[k].style.display='none'; return; }
+    chatPanel.style.display='none'; for (let k in p) p[k].style.display='none';
+    if (heroType==='gambler') p.hand.style.display='block'; else if (heroType==='fighter') p.fighter.style.display='block';
+    else if (heroType==='yun') p.yun.style.display='block'; else if (heroType==='qimen') p.qimen.style.display='block';
+    else if (heroType==='911') p.plane.style.display='block'; else if (heroType==='feng') p.feng.style.display='block';
+    else if (heroType==='rich') p.rich.style.display='block'; else if (heroType==='wushu') p.wushu.style.display='block';
+    else if (heroType==='engineer') p.engineer.style.display='block'; else if (heroType==='dunjia') p.dunjia.style.display='block';
+    else if (heroType==='kongcheng') p.kongcheng.style.display='block';
+    else if (heroType==='zhongzhi') p.zhongzhi.style.display='block';
+}
+function checkBuildBridgeButton() { const area=document.getElementById('buildBridgeArea'); if (!area||gameMode!=='skill'||aiHeroType!=='bridge'||gameOver||turn!==playerColor) { area.style.display='none'; return; } area.style.display=findPawnAtRiver()?'block':'none'; }
+
+const AI_CHAT_REPLIES=["对的对的","我赞同你的观点","你想表达什么？","那咋了","如何呢","不是哥们","你说的有道理","我不这么认为","哈哈，有意思","继续，我在听","然后呢？","嗯嗯，你继续说"];
+function sendChat() { const input=document.getElementById('chatInput'); const msg=input.value.trim(); if (!msg) return; const container=document.getElementById('chatMessages'); const userDiv=document.createElement('div'); userDiv.className='chat-msg-user'; userDiv.textContent='👤 '+msg; container.appendChild(userDiv); input.value=''; container.scrollTop=container.scrollHeight; setTimeout(()=>{ const reply=rnd(AI_CHAT_REPLIES); const aiDiv=document.createElement('div'); aiDiv.className='chat-msg-ai'; aiDiv.textContent='🤖 '+reply; container.appendChild(aiDiv); container.scrollTop=container.scrollHeight; }, 500+Math.random()*1000); }
+
+function resetGameState() {
+    board = Array(ROWS).fill().map(() => Array(COLS).fill('.')); for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) board[r][c] = INIT_BOARD[r][c];
+    turn='red'; selectedRow=selectedCol=-1; gameOver=false; aiThinking=animating=false; legalMovesForSelected=[]; clearOverlay(); document.getElementById('aiLogBox').innerHTML='';
+    hand=[]; maxSlots=7; discardIdx=-1; bombActive=false; tripleActive=false; goldHighlight=yunAnimation=null; planeAnimation=null; stopShockwaveAnimation(); shockwaveRing=null;
+    fighterCooldown=0; yunCooldown=0; planeCooldown=0; yunSelecting=false; qimenUsed={}; fengDawaUsed=false; fengDuqiaoUsed=false; silverCoins=0; goldCoins=0; placingGold=false; turnCount=0; greenPieces.clear(); rage=0;
+    buildingBridge=false; bridges=[true,true,true,true,true,true,true,true,true]; aiTurnCounter=0; dihuTurnCounter=0; railwayH.clear(); railwayV.clear(); engineerTurnCounter=0; playerBuildCooldown=0; playerRailwayMode=null; aiFighterCooldown=0; aiYunCooldown=0; aiPlaneCooldown=0;
+    invincibleMap.clear(); hiddenPiece=null; dunJiaZhongShield=false; oppDunJiaZhongShield=false; dunJiaZhongCooldown=0; dunJiaZhuanCount=10; dunJiaYueCount=10; dunJiaSelecting=null; dunJiaSelectedPiece=null;
+    dihuAnim=null; kongchengActive=false; kongchengTurns=0; kongchengUsedBy=null;
+    document.getElementById('status').classList.remove('game-over'); updateAllSkillUI(); updateSkillPanels(); drawBoard(); updateStatus();
+    if (turn===playerColor && heroType==='gambler') autoDraw(); checkBuildBridgeButton();
+    if (gameMode==='skill'||isOnline) { if (heroType==='kongcheng') { const my=playerColor; const toRemove=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p==='.'||getColor(p)!==my) continue; if (p.toLowerCase()==='k'||p.toLowerCase()==='a'||p.toLowerCase()==='b') continue; if (p.toLowerCase()==='p'&&c===4) continue; toRemove.push([r,c]); } for (let [r,c] of toRemove) { if (greenPieces.has(`${r},${c}`)) greenPieces.delete(`${r},${c}`); board[r][c]='.'; } kongchengActive=true; kongchengTurns=50; kongchengUsedBy=playerColor; aiSay('🏯 空城计发动！坚守50回合！', 'system'); } else if (aiHeroType==='kongcheng') { const my=aiColor; const toRemove=[]; for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) { const p=board[r][c]; if (p==='.'||getColor(p)!==my) continue; if (p.toLowerCase()==='k'||p.toLowerCase()==='a'||p.toLowerCase()==='b') continue; if (p.toLowerCase()==='p'&&c===4) continue; toRemove.push([r,c]); } for (let [r,c] of toRemove) { if (greenPieces.has(`${r},${c}`)) greenPieces.delete(`${r},${c}`); board[r][c]='.'; } kongchengActive=true; kongchengTurns=50; kongchengUsedBy=aiColor; aiSay('🏯 空城计发动！', 'system'); } }
+    drawBoard(); updateStatus(); updateKongchengUI();
+    if (turn===aiColor && aiEnabled) scheduleAiMove();
+}
+
+function startGame(pHero, aHero) { heroType=(pHero==='none'||!pHero)?null:pHero; aiHeroType=aHero==='bridge'?'bridge':(aHero==='engineer'?'engineer':(aHero==='fighter'?'fighter':(aHero==='yun'?'yun':(aHero==='plane'?'plane':(aHero==='dihu'?'dihu':(aHero==='kongcheng'?'kongcheng':(aHero==='zhongzhi'?'zhongzhi':null))))))); zhongzhiPlayerActive=(heroType==='zhongzhi'); zhongzhiAiActive=(aiHeroType==='zhongzhi'); if (gameMode==='normal') { heroType=null; aiHeroType=null; zhongzhiPlayerActive=false; zhongzhiAiActive=false; } document.getElementById('gameControls').style.display='flex'; document.getElementById('gameArea').style.display='flex'; canvas.style.display='block'; document.getElementById('skillPanel').style.display='flex'; updateSkillPanels(); resetGameState(); if (turn===aiColor && aiEnabled) scheduleAiMove(); }
+function selectMode(m) { gameMode=m; document.getElementById('modeSelection').style.display='none'; if (m==='online') { document.getElementById('onlineConnPanel').style.display='flex'; } else { document.getElementById('sideSelection').style.display='flex'; } }
+function chooseSide(c) { if (isOnline) { onlineChooseSide(c); return; } playerColor=c; aiColor=c==='red'?'black':'red'; document.getElementById('sideSelection').style.display='none'; if (gameMode==='normal') startGame(null,null); else document.getElementById('heroSelection').style.display='flex'; }
+function selectPlayerHero(t) { document.getElementById('heroSelection').style.display='none'; if (isOnline) { onlineChooseHero(t); return; } window._playerHero=t; document.getElementById('aiHeroSelection').style.display='flex'; }
+function selectAiHero(t) { document.getElementById('aiHeroSelection').style.display='none'; let a=t;     if (t==='random') { const opts=['bridge','engineer','fighter','yun','plane','dihu','kongcheng','zhongzhi','none']; a=rnd(opts); } startGame(window._playerHero||'none', a); }
+function backToMenu() { if (isOnline) { onlineCloseConnection(); } playerColor=aiColor=null; heroType=null; aiHeroType=null; gameMode=null; bombActive=false; tripleActive=false; buildingBridge=false; stopShockwaveAnimation(); dunJiaSelecting=null; placingGold=false; dihuAnim=null; kongchengActive=false; zhongzhiPlayerActive=false; zhongzhiAiActive=false; isOnline=false; isOnlineHost=false; onlineConnected=false; onlineMyColor=null; onlineOppColor=null; onlineSideChosen=false; onlineOppSideChosen=false; onlineHeroChosen=false; onlineOppHeroChosen=false; onlineOppHero=null; onlineRestartPending=false; document.getElementById('modeSelection').style.display='flex'; document.getElementById('sideSelection').style.display='none'; document.getElementById('heroSelection').style.display='none'; document.getElementById('aiHeroSelection').style.display='none'; document.getElementById('onlineConnPanel').style.display='none'; document.getElementById('gameControls').style.display='none'; document.getElementById('gameArea').style.display='none'; canvas.style.display='none'; document.getElementById('skillPanel').style.display='none'; document.getElementById('buildBridgeArea').style.display='none'; document.getElementById('onlineChatArea').style.display='none'; document.getElementById('resignBtn').style.display='none'; document.getElementById('leftPanelTitle').textContent='🤖 人机有话说'; gameOver=false; aiThinking=animating=false; clearOverlay(); document.getElementById('status').textContent='中国象棋'; }
+window.addEventListener('load', ()=>{ document.getElementById('modeSelection').style.display='flex'; document.getElementById('gameArea').style.display='none'; canvas.style.display='none'; document.getElementById('status').textContent='中国象棋'; });
+canvas.addEventListener('click', e => {
+    if (gameOver||aiThinking||animating||!playerColor) {
+        if (bombActive&&heroType==='gambler') { const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (p) { useBomb(p.row,p.col); return; } }
+        if (tripleActive&&heroType==='gambler') { const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (p) { useTriple(p.row,p.col); return; } }
+        if (yunSelecting&&heroType==='yun') { const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (p) { triggerYun(p.col); return; } }
+        if (dunJiaSelecting&&heroType==='dunjia') { const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (p) { if (dunJiaSelecting==='zhuan1'||dunJiaSelecting==='zhuan2') executeZhuan(p.row,p.col); else if (dunJiaSelecting==='yin') executeYin(p.row,p.col); else if (dunJiaSelecting==='yue1'||dunJiaSelecting==='yue2') executeYue(p.row,p.col); return; } }
+        if (placingGold&&heroType==='rich') { const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (p) { executePlaceGold(p.row,p.col); return; } }
+        return;
+    }
+    if (playerRailwayMode) { const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (p) { executePlayerRailway(p.row,p.col); } return; }
+    const rect=canvas.getBoundingClientRect(); const p=getRowCol((e.clientX-rect.left)*(CW/rect.width),(e.clientY-rect.top)*(CH/rect.height)); if (!p) return;
+    if (dunJiaSelecting&&heroType==='dunjia') { if (dunJiaSelecting==='zhuan1'||dunJiaSelecting==='zhuan2') executeZhuan(p.row,p.col); else if (dunJiaSelecting==='yin') executeYin(p.row,p.col); else if (dunJiaSelecting==='yue1'||dunJiaSelecting==='yue2') executeYue(p.row,p.col); return; }
+    if (placingGold&&heroType==='rich') { executePlaceGold(p.row,p.col); return; }
+    if (buildingBridge) { tryBuildBridge(p.row,p.col); return; }
+    if (bombActive&&heroType==='gambler') { useBomb(p.row,p.col); return; }
+    if (tripleActive&&heroType==='gambler') { useTriple(p.row,p.col); return; }
+    if (yunSelecting&&heroType==='yun') { triggerYun(p.col); return; }
+    if ((aiEnabled||isOnline)&&turn!==playerColor) return;
+    const piece=board[p.row][p.col];
+    if (selectedRow!==-1) { if (tryMove(selectedRow,selectedCol,p.row,p.col)) return; if (piece!=='.'&&getColor(piece)===turn&&(p.row!==selectedRow||p.col!==selectedCol)) { selectedRow=p.row; selectedCol=p.col; legalMovesForSelected=getLegalMoves(p.row,p.col); drawBoard(); } else drawBoard(); }
+    else if (piece!=='.'&&getColor(piece)===turn) { selectedRow=p.row; selectedCol=p.col; legalMovesForSelected=getLegalMoves(p.row,p.col); drawBoard(); }
+});
+function updateStatus() { const s=document.getElementById('status'); if (!playerColor) { s.textContent='中国象棋'; return; } if (gameOver) { s.textContent=`🏆 游戏结束，${turn==='red'?'红方':'黑方'}获胜！`; s.classList.add('game-over'); return; } s.classList.remove('game-over'); if (isOnline) { s.textContent=turn===playerColor?`轮到 ${playerColor==='red'?'红方 (你)':'黑方 (你)'}`:`等待对手走棋...`; } else { s.textContent=turn===playerColor?`轮到 ${playerColor==='red'?'红方 (你)':'黑方 (你)'}`:`对方走棋 ${aiThinking?'电脑思考中...':''}`; } }
+function toggleAI() { aiEnabled=!aiEnabled; const btn=document.getElementById('toggleAI'); btn.textContent=aiEnabled?'人机对战 (开启)':'双人对战 (关闭AI)'; btn.classList.toggle('active',aiEnabled); legalMovesForSelected=[]; if (aiEnabled&&!gameOver&&turn===aiColor&&!aiThinking&&!animating) scheduleAiMove(); drawBoard(); updateStatus(); }
+function resetGame() { if (!playerColor) return; if (isOnline) { sendOnline({type:'restart'}); onlineRestartPending=true; aiSay('⏳ 等待对方确认重开...', 'system'); return; } legalMovesForSelected=[]; stopShockwaveAnimation(); bombActive=false; tripleActive=false; buildingBridge=false; playerRailwayMode=null; dunJiaSelecting=null; placingGold=false; dihuAnim=null; kongchengActive=false; resetGameState(); if (turn===aiColor&&aiEnabled) scheduleAiMove(); }
+document.getElementById('toggleAI').classList.add('active'); updateStatus();
+// ==================== 彩蛋：中国电信 ====================
+const EGG_CODE = '5G用电信，致享3000兆，汇充用千兆5G，在家用千兆宽带、千兆WiFi，网速就是快！买5G手机，最高直降3500元，还有居家礼包等你领取！详情请看中国电信';
+let telecomActive = false;
+let telecomLogoImg = null;
+try { telecomLogoImg = new Image(); telecomLogoImg.src = 'data:image/png;base64,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'; } catch(e) { telecomLogoImg = null; }
+function openEggDialog() {
+    document.getElementById('eggOverlay').style.display = 'flex';
+    document.getElementById('eggCodeInput').value = '';
+    document.getElementById('eggMsg').textContent = '';
+    document.getElementById('eggCodeInput').focus();
+}
+function closeEggDialog() {
+    document.getElementById('eggOverlay').style.display = 'none';
+    document.getElementById('eggMsg').textContent = '';
+}
+function redeemEgg() {
+    const code = document.getElementById('eggCodeInput').value.trim();
+    if (code === EGG_CODE) {
+        telecomActive = true;
+        const eggBox = document.getElementById('eggOverlay').firstElementChild;
+        if (eggBox) { eggBox.style.boxShadow = '0 0 24px #0058b8, 0 0 48px rgba(0,88,184,0.5)'; eggBox.style.borderColor = '#0058b8'; }
+        aiSay('📶 中国电信专属皮肤已解锁！', 'system');
+        drawBoard();
+        setTimeout(closeEggDialog, 1200);
+    } else {
+        document.getElementById('eggMsg').textContent = '❌ 兑换码错误，再想想~';
+    }
+}
+document.getElementById('status').addEventListener('click', openEggDialog);
+// ==================== 底部悬停提示条 ====================
+(function () {
+    const tipBar = document.getElementById('tipBar');
+    if (!tipBar) return;
+    function bindTip(el) {
+        if (!el || el._tipBound) return;
+        el._tipBound = true;
+        el.addEventListener('mouseenter', function () {
+            const d = this.getAttribute('data-desc');
+            if (d) tipBar.textContent = d;
+        });
+        el.addEventListener('mouseleave', function () {
+            tipBar.textContent = '鼠标悬停技能或英雄可查看介绍';
+        });
+    }
+    function scan() {
+        document.querySelectorAll('[data-desc]').forEach(bindTip);
+    }
+    const mo = new MutationObserver(scan);
+    mo.observe(document.body, { childList: true, subtree: true });
+    scan();
+})();
+const INSULTS=["你这水平也敢来下棋？","我的马都比你聪明！","臭棋篓子！","就这？","你是不是用脚在下棋？","你是我见过最菜的对手！","吃你个子跟吃豆子似的！","垃圾！","废物点心！","你下棋像做梦似的！","送子观音吗？","不会下就别下！","我闭着眼睛都比你下得好！","你这智商告别象棋了！","chm的聪明程度是你的1145141919810倍！"];
+const DEATH_INSULTS=["不可能！","我居然输了？！","这局不算！","气死我了！","黑幕！","你一定是用外挂了！","不玩了！","我选择狗带！","你等着！","气死偶咧！"];
+const MOCKS=["哈哈哈！","弱爆了！","轻松拿下！","就这点本事？","碾压！","无敌是多么寂寞～","这就是实力差距！","我还能再打十个你！","搞定收工！","跟小学生打架一样！","就凭你？"];
+
+// ==================== 联机对战 ====================
+function sendOnline(msg) { if (onlineDataChannel && onlineDataChannel.readyState==='open') { try { onlineDataChannel.send(JSON.stringify(msg)); } catch(e) { console.error('sendOnline error:',e); } } }
+function sendOnlineAction(type, data) { sendOnline({type, data}); }
+
+function copyToClipboard(elementId) {
+    const el=document.getElementById(elementId);
+    el.select();
+    try { document.execCommand('copy'); aiSay('📋 已复制到剪贴板！','system'); } catch(e) { aiSay('❌ 复制失败，请手动复制','system'); }
+}
+
+function onlineCreateRoom() {
+    isOnlineHost=true; isOnline=true;
+    document.getElementById('connPhase1').style.display='none';
+    document.getElementById('connPhaseHost').style.display='flex';
+    document.getElementById('hostStatus').textContent='⏳ 正在生成邀请码...';
+    document.getElementById('hostStatus').className='conn-status waiting';
+
+    onlinePeerConn=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    onlineDataChannel=onlinePeerConn.createDataChannel('chess',{ordered:true});
+    onlineDataChannel.onopen=onOnlineChannelOpen;
+    onlineDataChannel.onmessage=function(e){ onOnlineMessage(JSON.parse(e.data)); };
+    onlineDataChannel.onclose=onOnlineChannelClose;
+
+    onlinePeerConn.oniceconnectionstatechange=function() {
+        if (onlinePeerConn.iceConnectionState==='failed'||onlinePeerConn.iceConnectionState==='disconnected') {
+            document.getElementById('hostStatus').textContent='⚠ 连接断开';
+            document.getElementById('hostStatus').className='conn-status error';
+        }
+    };
+
+    onlinePeerConn.createOffer().then(function(offer) {
+        return onlinePeerConn.setLocalDescription(offer);
+    }).then(function() {
+        return waitForIceGathering(onlinePeerConn);
+    }).then(function() {
+        document.getElementById('hostOffer').value=JSON.stringify(onlinePeerConn.localDescription);
+        document.getElementById('hostStatus').textContent='✅ 邀请码已生成！请发给对方';
+        document.getElementById('hostStatus').className='conn-status waiting';
+        document.getElementById('connPhaseHostAnswer').style.display='flex';
+    }).catch(function(err) {
+        document.getElementById('hostStatus').textContent='❌ 创建失败: '+err.message;
+        document.getElementById('hostStatus').className='conn-status error';
+    });
+}
+
+function onlineJoinRoom() {
+    isOnlineHost=false; isOnline=true;
+    document.getElementById('connPhase1').style.display='none';
+    document.getElementById('connPhaseJoin').style.display='flex';
+    document.getElementById('joinStatus').textContent='📝 请粘贴对方发来的邀请码';
+    document.getElementById('joinStatus').className='conn-status';
+}
+
+function onlineGenerateAnswer() {
+    const offerStr=document.getElementById('joinOffer').value.trim();
+    if (!offerStr) { document.getElementById('joinStatus').textContent='❌ 请粘贴邀请码！'; document.getElementById('joinStatus').className='conn-status error'; return; }
+
+    let offer;
+    try { offer=JSON.parse(offerStr); } catch(e) { document.getElementById('joinStatus').textContent='❌ 邀请码格式错误！'; document.getElementById('joinStatus').className='conn-status error'; return; }
+
+    document.getElementById('joinStatus').textContent='⏳ 正在生成应答码...';
+    document.getElementById('joinStatus').className='conn-status waiting';
+
+    onlinePeerConn=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    // 加入方不创建DataChannel，等待Host方创建后通过ondatachannel接收
+    onlinePeerConn.ondatachannel=function(event) {
+        onlineDataChannel=event.channel;
+        onlineDataChannel.onopen=onOnlineChannelOpen;
+        onlineDataChannel.onmessage=function(e){ onOnlineMessage(JSON.parse(e.data)); };
+        onlineDataChannel.onclose=onOnlineChannelClose;
+    };
+
+    onlinePeerConn.oniceconnectionstatechange=function() {
+        if (onlinePeerConn.iceConnectionState==='failed'||onlinePeerConn.iceConnectionState==='disconnected') {
+            document.getElementById('joinStatus').textContent='⚠ 连接断开';
+            document.getElementById('joinStatus').className='conn-status error';
+        }
+    };
+
+    onlinePeerConn.setRemoteDescription(offer).then(function() {
+        return onlinePeerConn.createAnswer();
+    }).then(function(answer) {
+        return onlinePeerConn.setLocalDescription(answer);
+    }).then(function() {
+        return waitForIceGathering(onlinePeerConn);
+    }).then(function() {
+        document.getElementById('joinAnswer').value=JSON.stringify(onlinePeerConn.localDescription);
+        document.getElementById('joinAnswerArea').style.display='flex';
+        document.getElementById('joinStatus').textContent='✅ 应答码已生成！请发给对方';
+        document.getElementById('joinStatus').className='conn-status waiting';
+    }).catch(function(err) {
+        document.getElementById('joinStatus').textContent='❌ 生成失败: '+err.message;
+        document.getElementById('joinStatus').className='conn-status error';
+    });
+}
+
+function onlineAcceptAnswer() {
+    const answerStr=document.getElementById('hostAnswerInput').value.trim();
+    if (!answerStr) { document.getElementById('hostAnswerStatus').textContent='❌ 请粘贴应答码！'; document.getElementById('hostAnswerStatus').className='conn-status error'; return; }
+    let answer;
+    try { answer=JSON.parse(answerStr); } catch(e) { document.getElementById('hostAnswerStatus').textContent='❌ 应答码格式错误！'; document.getElementById('hostAnswerStatus').className='conn-status error'; return; }
+    onlinePeerConn.setRemoteDescription(answer).then(function() {
+        document.getElementById('hostAnswerStatus').textContent='⏳ 正在连接...';
+        document.getElementById('hostAnswerStatus').className='conn-status waiting';
+    }).catch(function(err) {
+        document.getElementById('hostAnswerStatus').textContent='❌ 连接失败: '+err.message;
+        document.getElementById('hostAnswerStatus').className='conn-status error';
+    });
+}
+
+function waitForIceGathering(pc) {
+    return new Promise(function(resolve) {
+        if (pc.iceGatheringState==='complete') { resolve(); return; }
+        var timer=setInterval(function() {
+            if (pc.iceGatheringState==='complete') { clearInterval(timer); resolve(); }
+        }, 100);
+        setTimeout(function() { clearInterval(timer); resolve(); }, 10000);
+    });
+}
+
+function onOnlineChannelOpen() {
+    onlineConnected=true;
+    document.getElementById('onlineConnPanel').style.display='none';
+    // 房主执红，房员执黑
+    if (isOnlineHost) { onlineMyColor='red'; onlineOppColor='black'; }
+    else { onlineMyColor='black'; onlineOppColor='red'; }
+    onlineSideChosen=true; onlineOppSideChosen=true;
+    aiSay('🌐 联机已连接！你执'+(onlineMyColor==='red'?'红方':'黑方'),'system');
+    // 直接进入选英雄，跳过选边
+    document.getElementById('heroSelection').style.display='flex';
+}
+
+function onOnlineChannelClose() {
+    if (isOnline) {
+        aiSay('⚠ 对手已断线','system');
+        onlineCloseConnection();
+    }
+}
+
+function onlineCancel() {
+    onlineCloseConnection();
+    document.getElementById('onlineConnPanel').style.display='none';
+    document.getElementById('modeSelection').style.display='flex';
+    // 重置联机面板
+    document.getElementById('connPhase1').style.display='flex';
+    document.getElementById('connPhaseHost').style.display='none';
+    document.getElementById('connPhaseJoin').style.display='none';
+    document.getElementById('connPhaseHostAnswer').style.display='none';
+    document.getElementById('joinAnswerArea').style.display='none';
+    isOnline=false; isOnlineHost=false; onlineConnected=false;
+}
+
+function onlineCloseConnection() {
+    if (onlineDataChannel) { try { onlineDataChannel.close(); } catch(e){} }
+    if (onlinePeerConn) { try { onlinePeerConn.close(); } catch(e){} }
+    onlineDataChannel=null; onlinePeerConn=null; onlineConnected=false;
+}
+
+// 联机选边（已废弃，颜色自动分配，保留以防万一）
+function onlineChooseSide(c) {
+    aiSay('⚠ 联机模式颜色自动分配（房主红/房员黑）','system');
+    checkOnlineBothReady();
+}
+
+// 联机选英雄
+function onlineChooseHero(t) {
+    onlineHeroChosen=true;
+    window._playerHero=t;
+    sendOnline({type:'hero', hero:t});
+    document.getElementById('heroSelection').style.display='none';
+    aiSay('✅ 你已选择英雄','system');
+    checkOnlineBothReady();
+}
+
+function checkOnlineBothReady() {
+    if (onlineSideChosen && onlineOppSideChosen && onlineHeroChosen && onlineOppHeroChosen) {
+        // 双方都选好了，开始游戏
+        playerColor=onlineMyColor;
+        aiColor=onlineOppColor;
+        heroType=(window._playerHero==='none'||!window._playerHero)?null:window._playerHero;
+        aiHeroType=onlineOppHero==='none'?null:onlineOppHero;
+        zhongzhiPlayerActive=(heroType==='zhongzhi');
+        zhongzhiAiActive=(aiHeroType==='zhongzhi');
+        aiEnabled=false; // 联机模式关闭AI
+        gameMode='skill';
+        document.getElementById('gameControls').style.display='flex';
+        document.getElementById('gameArea').style.display='flex';
+        canvas.style.display='block';
+        document.getElementById('skillPanel').style.display='flex';
+        document.getElementById('resignBtn').style.display='inline-block';
+        document.getElementById('leftPanelTitle').textContent='💬 对手对话';
+        document.getElementById('onlineChatArea').style.display='block';
+        // 隐藏人机切换按钮
+        document.getElementById('toggleAI').style.display='none';
+        updateSkillPanels();
+        resetGameState();
+        drawBoard();
+        updateStatus();
+        updateAllSkillUI();
+        if (turn===playerColor && heroType==='gambler') autoDraw();
+        aiSay('🎮 联机对战开始！','system');
+    } else if (onlineHeroChosen && !onlineOppHeroChosen) {
+        aiSay('⏳ 等待对方选英雄...','system');
+    }
+}
+
+// 联机走棋接收重放
+function applyRemoteMove(data) {
+    var fr=data.from[0], fc=data.from[1], tr=data.to[0], tc=data.to[1];
+    var piece=board[fr][fc];
+    if (!piece || piece==='.') { return; }
+    var captured=board[tr][tc];
+    // 用动画重放对方走棋
+    animateMove(fr,fc,tr,tc,piece,captured,function() {
+        // 动画结束后处理状态
+        if (captured!=='.' && getColor(captured)!==playerColor && heroType==='rich' && captured.toLowerCase()!=='g') { silverCoins++; updateRichUI(); autoConvertCoins(); }
+        if (captured!=='.' && getColor(captured)!==playerColor && heroType==='gambler') incSlots();
+        var moverColor=getColor(piece);
+        afterMove(moverColor);
+        drawBoard(); updateStatus();
+        if (turn===playerColor) { turnCount++; if (heroType==='rich'&&turnCount%2===0) { silverCoins++; updateRichUI(); autoConvertCoins(); } tickCooldowns(); if (heroType==='gambler') autoDraw(); updateAllSkillUI(); checkBuildBridgeButton(); updateDunJiaUI(); updateKongchengUI(); }
+        // 接收对方状态覆盖
+        if (data.state) { applyRemoteState(data.state); }
+    });
+}
+
+// 序列化当前游戏状态（用于联机同步）
+function serializeGameState() {
+    return {
+        board: board.map(function(r){return r.slice();}),
+        turn: turn,
+        gameOver: gameOver,
+        hand: hand.slice(),
+        maxSlots: maxSlots,
+        fighterCooldown: fighterCooldown,
+        yunCooldown: yunCooldown,
+        planeCooldown: planeCooldown,
+        fengDawaUsed: fengDawaUsed,
+        fengDuqiaoUsed: fengDuqiaoUsed,
+        silverCoins: silverCoins,
+        goldCoins: goldCoins,
+        turnCount: turnCount,
+        greenPieces: Array.from(greenPieces),
+        rage: rage,
+        bridges: bridges.slice(),
+        railwayH: Array.from(railwayH),
+        railwayV: Array.from(railwayV),
+        playerBuildCooldown: playerBuildCooldown,
+        invincibleMap: Array.from(invincibleMap.entries()),
+        hiddenPiece: hiddenPiece,
+        dunJiaZhongShield: dunJiaZhongShield,
+        oppDunJiaZhongShield: oppDunJiaZhongShield,
+        dunJiaZhongCooldown: dunJiaZhongCooldown,
+        dunJiaZhuanCount: dunJiaZhuanCount,
+        dunJiaYueCount: dunJiaYueCount,
+        qimenUsed: Object.assign({}, qimenUsed),
+        kongchengActive: kongchengActive,
+        kongchengTurns: kongchengTurns,
+        kongchengUsedBy: kongchengUsedBy,
+        zhongzhiPlayerActive: zhongzhiPlayerActive,
+        zhongzhiAiActive: zhongzhiAiActive,
+        bombActive: bombActive,
+        tripleActive: tripleActive
+    };
+}
+
+// 应用远程状态
+function applyRemoteState(state) {
+    if (!state) return;
+    if (state.board) board=state.board.map(function(r){return r.slice();});
+    if (state.turn) turn=state.turn;
+    if (state.gameOver!==undefined) gameOver=state.gameOver;
+    if (state.hand) hand=state.hand.slice();
+    if (state.maxSlots!==undefined) maxSlots=state.maxSlots;
+    if (state.fighterCooldown!==undefined) fighterCooldown=state.fighterCooldown;
+    if (state.yunCooldown!==undefined) yunCooldown=state.yunCooldown;
+    if (state.planeCooldown!==undefined) planeCooldown=state.planeCooldown;
+    if (state.fengDawaUsed!==undefined) fengDawaUsed=state.fengDawaUsed;
+    if (state.fengDuqiaoUsed!==undefined) fengDuqiaoUsed=state.fengDuqiaoUsed;
+    if (state.silverCoins!==undefined) silverCoins=state.silverCoins;
+    if (state.goldCoins!==undefined) goldCoins=state.goldCoins;
+    if (state.turnCount!==undefined) turnCount=state.turnCount;
+    if (state.greenPieces) greenPieces=new Set(state.greenPieces);
+    if (state.rage!==undefined) rage=state.rage;
+    if (state.bridges) bridges=state.bridges.slice();
+    if (state.railwayH) railwayH=new Set(state.railwayH);
+    if (state.railwayV) railwayV=new Set(state.railwayV);
+    if (state.playerBuildCooldown!==undefined) playerBuildCooldown=state.playerBuildCooldown;
+    if (state.invincibleMap) invincibleMap=new Map(state.invincibleMap);
+    if (state.hiddenPiece!==undefined) hiddenPiece=state.hiddenPiece;
+    if (state.dunJiaZhongShield!==undefined) dunJiaZhongShield=state.dunJiaZhongShield;
+    if (state.oppDunJiaZhongShield!==undefined) oppDunJiaZhongShield=state.oppDunJiaZhongShield;
+    if (state.dunJiaZhongCooldown!==undefined) dunJiaZhongCooldown=state.dunJiaZhongCooldown;
+    if (state.dunJiaZhuanCount!==undefined) dunJiaZhuanCount=state.dunJiaZhuanCount;
+    if (state.dunJiaYueCount!==undefined) dunJiaYueCount=state.dunJiaYueCount;
+    if (state.qimenUsed) qimenUsed=Object.assign({}, state.qimenUsed);
+    if (state.kongchengActive!==undefined) kongchengActive=state.kongchengActive;
+    if (state.kongchengTurns!==undefined) kongchengTurns=state.kongchengTurns;
+    if (state.kongchengUsedBy!==undefined) kongchengUsedBy=state.kongchengUsedBy;
+    if (state.zhongzhiPlayerActive!==undefined) zhongzhiPlayerActive=state.zhongzhiPlayerActive;
+    if (state.zhongzhiAiActive!==undefined) zhongzhiAiActive=state.zhongzhiAiActive;
+    if (state.bombActive!==undefined) bombActive=state.bombActive;
+    if (state.tripleActive!==undefined) tripleActive=state.tripleActive;
+    drawBoard();
+    updateStatus();
+    updateAllSkillUI();
+}
+
+// 联机消息处理
+function onOnlineMessage(msg) {
+    if (!msg || !msg.type) return;
+
+    switch(msg.type) {
+        case 'side':
+            // 对方选边
+            onlineOppColor=msg.color;
+            onlineMyColor=msg.color==='red'?'black':'red';
+            onlineOppSideChosen=true;
+            aiSay('🌐 对方选择了'+(msg.color==='red'?'红方':'黑方'),'system');
+            checkOnlineBothReady();
+            break;
+
+        case 'hero':
+            // 对方选英雄
+            onlineOppHero=msg.hero;
+            onlineOppHeroChosen=true;
+            aiSay('🌐 对方已选择英雄','system');
+            checkOnlineBothReady();
+            break;
+
+        case 'move':
+            // 对方走棋
+            applyRemoteMove(msg);
+            break;
+
+        case 'state':
+            // 对方发送完整状态同步
+            applyRemoteState(msg.state);
+            break;
+
+        case 'chat':
+            // 对方聊天
+            var box=document.getElementById('aiLogBox');
+            var div=document.createElement('div');
+            div.className='chat-msg opp';
+            div.textContent=msg.text;
+            box.appendChild(div);
+            box.scrollTop=box.scrollHeight;
+            break;
+
+        case 'restart':
+            // 对方请求重开
+            aiSay('🔄 对方请求重新开始','system');
+            onlineRestartPending=false;
+            legalMovesForSelected=[];
+            stopShockwaveAnimation();
+            bombActive=false; tripleActive=false; buildingBridge=false;
+            playerRailwayMode=null; dunJiaSelecting=null; placingGold=false;
+            dihuAnim=null; kongchengActive=false;
+            resetGameState();
+            drawBoard(); updateStatus();
+            // 回复同意
+            sendOnline({type:'restartAck'});
+            break;
+
+        case 'restartAck':
+            // 对方同意重开
+            onlineRestartPending=false;
+            aiSay('✅ 对方已同意重新开始','system');
+            legalMovesForSelected=[];
+            stopShockwaveAnimation();
+            bombActive=false; tripleActive=false; buildingBridge=false;
+            playerRailwayMode=null; dunJiaSelecting=null; placingGold=false;
+            dihuAnim=null; kongchengActive=false;
+            resetGameState();
+            drawBoard(); updateStatus();
+            break;
+
+        case 'resign':
+            // 对方认输
+            gameOver=true;
+            turn=playerColor;
+            showOverlay('对手认输！你赢了！', playerColor==='red'?'#b71c1c':'#1a237e', 0);
+            drawBoard(); updateStatus();
+            aiSay('🏆 对手认输！','mock');
+            break;
+    }
+}
+
+// 联机聊天
+function sendOnlineChat() {
+    var input=document.getElementById('onlineChatInput');
+    var msg=input.value.trim();
+    if (!msg) return;
+    input.value='';
+    // 显示自己的消息
+    var box=document.getElementById('aiLogBox');
+    var div=document.createElement('div');
+    div.className='chat-msg own';
+    div.textContent='我: '+msg;
+    box.appendChild(div);
+    box.scrollTop=box.scrollHeight;
+    // 发送给对方
+    sendOnline({type:'chat', text:msg});
+}
+
+// 联机认输
+function onlineResign() {
+    if (!isOnline || !onlineConnected) return;
+    sendOnline({type:'resign'});
+    gameOver=true;
+    turn=aiColor;
+    showOverlay('你已认输', '#b71c1c', 0);
+    drawBoard(); updateStatus();
+    aiSay('🏳️ 你已认输','system');
+}
+</script>
+</body>
+</html>
